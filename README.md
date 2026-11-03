@@ -8,6 +8,8 @@ The first deliverable is a read-only UXP compatibility prototype targeting Premi
 
 [Load and run the prototype](prototype/README.md). [Compatibility findings and pending checks](docs/premiere-compatibility.md).
 
+A separate [CEP template proof](prototype/cep/README.md) tests creating three editable timed text states using an already installed MOGRT. Its development installer records the prior CEP developer setting. This proof is not the finished transcript-to-subtitles workflow.
+
 The documented UXP `MogrtText` API starts at 27.0, so a complete graphics implementation for 26.2.2 must not assume that API is available. Parameter inspection is diagnostic evidence, not proof that writing text works.
 
 ## Local checks

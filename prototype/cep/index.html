@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Subtitle Graphics Proof</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
+<style>
+  body { margin: 16px; background: #292929; color: #f5f5f5; font: 13px/1.5 sans-serif; }
+  h1 { font-size: 18px; }
+  button { padding: 8px 12px; margin: 0 8px 8px 0; background: #424242; color: #fff; border: 1px solid #aaa; border-radius: 4px; cursor: pointer; }
+  button:focus-visible { outline: 2px solid #9ccfff; outline-offset: 2px; }
+  button:disabled { cursor: default; opacity: .6; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+</style></head><body>
+<h1>Subtitle graphics proof</h1>
+<p>Create a separate three-second test sequence containing editable “I”, “I like”, and “I like this” graphics.</p>
+<button id="inspect">Inspect selected graphic</button><button id="create">Create three-word test</button>
+<p id="status" role="status" aria-live="polite">Ready. Creating the test adds a new sequence and leaves your existing edit intact.</p>
+<pre id="result" aria-label="Test result"></pre>
+<script src="config.js"></script><script src="main.js"></script>
+</body></html>
