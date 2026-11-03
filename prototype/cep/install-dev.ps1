@@ -21,7 +21,7 @@ if (-not (Test-Path -LiteralPath $statePath)) {
         ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding utf8
 }
 
-foreach ($file in @('index.html', 'main.js', 'planner.js', 'host.jsx', '.debug')) {
+foreach ($file in @('index.html', 'main.js', 'planner.js', 'appearance.js', 'host.jsx', '.debug')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $installPath $file) -Force
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CSXS/manifest.xml') -Destination (Join-Path $installPath 'CSXS/manifest.xml') -Force
@@ -33,4 +33,4 @@ New-Item -Path $registryPath -Force | Out-Null
 New-ItemProperty -LiteralPath $registryPath -Name PlayerDebugMode -Value '1' -PropertyType String -Force | Out-Null
 Write-Output "Development panel installed at $installPath"
 Write-Output 'CEP 12 unsigned-extension developer mode is enabled; its prior value is recorded in install-state.json.'
-Write-Output 'Save your project, restart Premiere, and open Window > Extensions > Subtitle Graphics Proof.'
+Write-Output 'Save your project, restart Premiere, and open Window > Extensions > Subtitle Generator.'

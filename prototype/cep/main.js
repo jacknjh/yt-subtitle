@@ -4,6 +4,17 @@ let busy = false;
 let generating = false;
 let cancelled = false;
 let phraseSnapshot = null;
+let parentReady = false;
+let renderedPlan = null;
+let previewClips = [];
+let previewPlaying = false;
+let previewRequest = 0;
+let previewStarted = 0;
+const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation'];
+
+function appearance() {
+  return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color').value, highlightColor: element('highlight-color').value, x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value });
+}
 
 function host(expression) {
   return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(expression, raw => {
@@ -18,18 +29,72 @@ function host(expression) {
 function argument(value) { return JSON.stringify(value).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'); }
 
 function controls() {
-  ['load', 'characters', 'single-word', 'capture-style', 'apply-style', 'read-phrase', 'phrase-text'].forEach(id => { element(id).disabled = busy; });
+  ['load', 'characters', 'single-word', 'capture-style', 'read-phrase', 'phrase-text', 'preview-play', 'preview-time', 'preview-phrase'].concat(appearanceIds).forEach(id => { element(id).disabled = busy; });
+  element('apply-style').disabled = busy || !parentReady;
   element('generate').disabled = busy || !loaded;
   element('cancel').disabled = !generating;
   element('update-phrase').disabled = busy || !phraseSnapshot;
 }
 
 function preview() {
-  if (!loaded) return null;
-  const plan = planTranscript(loaded.data, Number(element('characters').value), element('single-word').checked, loaded.context.fps);
-  element('summary').textContent = loaded.context.sequenceName + ': ' + plan.wordCount + ' words, ' + plan.phrases.length + ' phrases.';
+  stopPreview();
+  const sample = { segments: [{ words: ['Preview', 'your', 'subtitles.'].map((text, i) => ({ text, start: i * .5, duration: .5 })) }] };
+  const plan = planTranscript(loaded ? loaded.data : sample, Number(element('characters').value), element('single-word').checked, loaded ? loaded.context.fps : 30);
+  if (loaded) element('summary').textContent = loaded.context.sequenceName + ': ' + plan.wordCount + ' words, ' + plan.phrases.length + ' phrases.';
   element('preview').textContent = plan.phrases.slice(0, 5).join('\n');
+  renderedPlan = plan;
+  const select = element('preview-phrase');
+  let selected = Number(select.value);
+  if (select.value === '' || selected >= plan.phrases.length) selected = Math.max(0, plan.phrases.findIndex(text => text.includes(' ')));
+  select.innerHTML = '';
+  plan.phrases.forEach((text, index) => {
+    const option = document.createElement('option'); option.value = String(index); option.textContent = text; select.appendChild(option);
+  });
+  select.value = String(selected);
+  choosePreviewPhrase();
   return plan;
+}
+
+function stopPreview() {
+  previewPlaying = false;
+  if (previewRequest) window.cancelAnimationFrame(previewRequest);
+  element('preview-play').textContent = 'Play preview';
+  element('preview-play').setAttribute('aria-pressed', 'false');
+}
+
+function choosePreviewPhrase() {
+  stopPreview();
+  previewClips = renderedPlan.clips.filter(clip => clip.phraseIndex === Number(element('preview-phrase').value));
+  element('preview-time').max = Math.max(1, previewClips[previewClips.length - 1].endFrame - previewClips[0].startFrame);
+  element('preview-time').value = '0';
+  drawPreview();
+}
+
+function drawPreview() {
+  const canvas = element('subtitle-preview');
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx || !previewClips.length) return;
+  const style = appearance();
+  ctx.setTransform(canvas.width / 1920, 0, 0, canvas.height / 1080, 0, 0);
+  ctx.fillStyle = '#151515'; ctx.fillRect(0, 0, 1920, 1080);
+  const caption = SubtitleAppearance.captionAt(previewClips, previewClips[0].startFrame + Number(element('preview-time').value));
+  if (!caption) return;
+  const fonts = { 'Heebo-SemiBold': ['Heebo', 600], ArialMT: ['Arial', 400], 'Arial-BoldMT': ['Arial', 700], TimesNewRomanPSMT: ['Times New Roman', 400] };
+  const font = fonts[style.font] || [style.font, 400];
+  ctx.font = font[1] + ' ' + style.size + 'px "' + font[0].replace(/["\\]/g, '') + '", sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const x = style.x * 19.2, y = style.y * 10.8, text = SubtitleAppearance.splitHighlight(caption.text);
+  ctx.fillStyle = style.textColor; ctx.fillText(text.prefix, x, y);
+  ctx.fillStyle = style.mode === 'reveal-highlight' ? style.highlightColor : style.textColor;
+  ctx.fillText(text.word, x + ctx.measureText(text.prefix).width, y);
+}
+
+function animatePreview() {
+  if (!previewPlaying) return;
+  const fps = loaded ? loaded.context.fps : 30;
+  element('preview-time').value = String(Math.floor((Date.now() - previewStarted) * fps / 1000) % (Number(element('preview-time').max) + 1));
+  drawPreview();
+  previewRequest = window.requestAnimationFrame(animatePreview);
 }
 
 // Also used by the development transcript reader; file loading binds to the active sequence.
@@ -39,6 +104,7 @@ function acceptTranscript(json, context) {
   const data = JSON.parse(json.replace(/^\uFEFF/, ''));
   planTranscript(data, Number(element('characters').value), element('single-word').checked, context.fps);
   loaded = { data, context };
+  element('preview-phrase').value = '';
   preview();
   controls();
   element('status').textContent = 'Transcript ready. Generation duplicates this sequence and adds editable word graphics to its empty top video track.';
@@ -66,13 +132,21 @@ element('generate').addEventListener('click', async () => {
   let inserted = 0;
   try {
     const plan = preview();
+    const settings = appearance();
     if (!window.proofConfig) throw new Error('The local subtitle template has not been configured.');
     busy = true; generating = true; cancelled = false; controls();
-    created = await host('YTSubtitle.beginGeneration(' + argument({ ...window.proofConfig, ...loaded.context }) + ')');
+    const started = Date.now();
+    element('generation-progress').hidden = false;
+    element('generation-progress').max = plan.clips.length;
+    element('generation-progress').value = 0;
+    element('progress-label').textContent = 'Preparing one template for reuse…';
+    created = await host('YTSubtitle.beginGeneration(' + argument({ ...window.proofConfig, ...loaded.context, appearance: settings }) + ')');
     for (let index = 0; index < plan.clips.length && !cancelled; index += 5) {
       element('status').textContent = 'Creating editable graphics: ' + inserted + ' / ' + plan.clips.length + '. You can stop after this batch.';
       const batch = await host('YTSubtitle.insertBatch(' + argument(created.sequenceId) + ',' + argument(plan.clips.slice(index, index + 5)) + ')');
       inserted = batch.total;
+      element('generation-progress').value = inserted;
+      element('progress-label').textContent = inserted + ' / ' + plan.clips.length + ' graphics, ' + ((Date.now() - started) / 1000).toFixed(1) + ' seconds elapsed';
       await new Promise(resolve => setTimeout(resolve, 0));
     }
     element('status').textContent = (cancelled ? 'Stopped. ' : 'Done. ') + inserted + ' editable graphics in “' + created.sequenceName + '”. The source sequence is unchanged.';
@@ -92,8 +166,14 @@ async function editSelected(expression, completed) {
   finally { busy = false; controls(); }
 }
 
-element('capture-style').addEventListener('click', () => editSelected('YTSubtitle.captureStyle()'));
-element('apply-style').addEventListener('click', () => editSelected('YTSubtitle.applyStyle()'));
+element('capture-style').addEventListener('click', () => {
+  parentReady = false;
+  element('parent-status').textContent = 'Setting parent…';
+  return editSelected('YTSubtitle.setParentFromPlayhead()', result => { parentReady = true; element('parent-status').textContent = 'Parent: ' + result.parentName; }).then(() => {
+    if (!parentReady) element('parent-status').textContent = 'No parent set.';
+  });
+});
+element('apply-style').addEventListener('click', () => editSelected('YTSubtitle.syncSelectedToParent()'));
 element('read-phrase').addEventListener('click', () => {
   phraseSnapshot = null;
   return editSelected('YTSubtitle.readPhrase()', result => { phraseSnapshot = result; element('phrase-text').value = result.text; });
@@ -103,4 +183,19 @@ element('update-phrase').addEventListener('click', () => {
   return editSelected('YTSubtitle.updatePhrase(' + argument({ ...phraseSnapshot, text: element('phrase-text').value }) + ')');
 });
 
+appearanceIds.forEach(id => element(id).addEventListener('input', () => {
+  try { appearance(); drawPreview(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
+  catch (error) { stopPreview(); element('status').textContent = error.message; }
+}));
+element('preview-phrase').addEventListener('change', choosePreviewPhrase);
+element('preview-time').addEventListener('input', () => { stopPreview(); drawPreview(); });
+element('preview-play').addEventListener('click', () => {
+  if (previewPlaying) { stopPreview(); return; }
+  previewPlaying = true;
+  previewStarted = Date.now() - Number(element('preview-time').value) / (loaded ? loaded.context.fps : 30) * 1000;
+  element('preview-play').textContent = 'Pause preview';
+  element('preview-play').setAttribute('aria-pressed', 'true');
+  animatePreview();
+});
+preview();
 controls();

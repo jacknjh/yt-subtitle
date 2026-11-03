@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="local.ytsubtitle.proof" ExtensionBundleVersion="0.0.1" ExtensionBundleName="Subtitle Graphics Proof">
+<ExtensionManifest Version="7.0" ExtensionBundleId="local.ytsubtitle.proof" ExtensionBundleVersion="0.0.1" ExtensionBundleName="Subtitle Generator">
   <ExtensionList><Extension Id="local.ytsubtitle.proof.panel" Version="0.0.1" /></ExtensionList>
   <ExecutionEnvironment>
     <HostList><Host Name="PPRO" Version="[26.2,27.0)" /></HostList>
@@ -11,7 +11,7 @@
       <CEFCommandLine><Parameter>--remote-debugging-address=127.0.0.1</Parameter></CEFCommandLine>
     </Resources>
     <Lifecycle><AutoVisible>true</AutoVisible></Lifecycle>
-    <UI><Type>Panel</Type><Menu>Subtitle Graphics Proof</Menu>
+    <UI><Type>Panel</Type><Menu>Subtitle Generator</Menu>
       <Geometry><Size><Width>420</Width><Height>480</Height></Size><MinSize><Width>280</Width><Height>300</Height></MinSize></Geometry>
     </UI>
   </DispatchInfo></Extension></DispatchInfoList>

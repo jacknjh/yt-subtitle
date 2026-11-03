@@ -1,6 +1,9 @@
 if (typeof JSON === 'undefined' && typeof $ !== 'undefined') {
     $.evalFile(new File($.fileName).parent.fsName + '/vendor/json2.js');
 }
+if (typeof SubtitleAppearance === 'undefined' && typeof $ !== 'undefined') {
+    $.evalFile(new File($.fileName).parent.fsName + '/appearance.js');
+}
 
 var YTSubtitle = (function () {
     function timeAtTicks(ticks) { var value = new Time(); value.ticks = String(ticks); return value; }
@@ -20,19 +23,18 @@ var YTSubtitle = (function () {
         if (JSON.parse(parameter.getValue()).textEditValue !== text) throw new Error('Template text readback did not match the requested text.');
     }
 
-    function setControl(properties, name, value) {
+    function setControl(properties, name, value, updateUI) {
         var parameter = properties.getParamForDisplayName(name);
         if (!parameter) throw new Error('Template is missing the required control: ' + name);
-        parameter.setValue(value, true);
+        parameter.setValue(value, updateUI === true);
     }
 
-    function configureGraphic(clip, text) {
+    function configureGraphic(clip, text, appearance) {
         var component = clip.getMGTComponent();
         if (!component) throw new Error('The inserted template exposes no MOGRT component.');
         var properties = component.properties;
         var parameter = properties.getParamForDisplayName('Text');
         if (!parameter) throw new Error('The template needs an exposed Text control.');
-        changeText(parameter, text);
         setControl(properties, 'Animation', false);
         setControl(properties, 'Fit in Title Safe', false);
         setControl(properties, 'Paragraph Alignment', 2);
@@ -42,6 +44,31 @@ var YTSubtitle = (function () {
         setControl(properties, 'Type-On Opacity', 100);
         setControl(properties, 'Active Word Opacity', 100);
         setControl(properties, 'Box Opacity', 0);
+        if (appearance) {
+            var data = JSON.parse(parameter.getValue());
+            if (!data.fontEditValue || data.fontEditValue.length !== 1) throw new Error('The template font cannot be edited uniformly.');
+            data.fontEditValue = [appearance.font];
+            parameter.setValue(JSON.stringify(data), false);
+            var base = generation.baseSize;
+            if (!base) {
+                base = properties.getParamForDisplayName('Size').getValue();
+                if (!base || base.length !== 2 || !data.fontSizeEditValue || typeof data.fontSizeEditValue[0] !== 'number' || data.fontSizeEditValue[0] <= 0) throw new Error('Template font scale is unsupported.');
+                generation.baseSize = [base[0], base[1]];
+                generation.baseFontSize = data.fontSizeEditValue[0];
+            }
+            var ratio = appearance.size / generation.baseFontSize;
+            setControl(properties, 'Size', [base[0] * ratio, base[1] * ratio]);
+            setControl(properties, 'Offset', [appearance.x / 100 - 0.5, appearance.y / 100 - 0.5]);
+            var names = ['Fill Color', 'Active Word Color'];
+            var colors = [appearance.textColor, appearance.mode === 'reveal' ? appearance.textColor : appearance.highlightColor];
+            for (var n = 0; n < names.length; n++) {
+                var color = properties.getParamForDisplayName(names[n]);
+                if (!color) throw new Error('Template color control is missing: ' + names[n]);
+                var hex = colors[n];
+                color.setColorValue(color.getColorValue()[0], parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16), false);
+            }
+        }
+        changeText(parameter, text);
     }
 
     var generation = null;
@@ -77,6 +104,7 @@ var YTSubtitle = (function () {
             generation = null;
             var current = context();
             if (!options || current.sequenceId !== options.sequenceId || current.projectPath !== options.projectPath) throw new Error('Switch back to the sequence used to load this transcript.');
+            var appearance = options.appearance ? SubtitleAppearance.validate(options.appearance) : null;
             if (!/\.mogrt$/i.test(options.templatePath) || !new File(options.templatePath).exists) throw new Error('The local subtitle template is missing.');
             var source = app.project.activeSequence;
             var trackIndex = -1;
@@ -99,7 +127,7 @@ var YTSubtitle = (function () {
             sequence.name = source.name + ' - subtitles ' + new Date().getTime();
             app.project.openSequence(sequence.sequenceID);
             if (context().sequenceId !== sequence.sequenceID) throw new Error('Could not activate the duplicated sequence.');
-            generation = { sequence: sequence, projectPath: current.projectPath, templatePath: new File(options.templatePath).fsName, trackIndex: trackIndex, count: 0, lastEnd: -1 };
+            generation = { sequence: sequence, projectPath: current.projectPath, templatePath: new File(options.templatePath).fsName, trackIndex: trackIndex, count: 0, lastEnd: -1, projectItem: null, appearance: appearance };
             return JSON.stringify({ ok: true, sequenceId: sequence.sequenceID, sequenceName: sequence.name, trackIndex: trackIndex });
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) }); }
     }
@@ -115,10 +143,23 @@ var YTSubtitle = (function () {
                 if (current.sequenceId !== sequenceId || current.projectPath !== generation.projectPath) throw new Error('Active sequence changed; generation stopped.');
                 var state = clips[i];
                 if (typeof state.text !== 'string' || !state.text.length || typeof state.startFrame !== 'number' || typeof state.endFrame !== 'number' || !isFinite(state.startFrame) || !isFinite(state.endFrame) || state.startFrame % 1 || state.endFrame % 1 || state.startFrame < 0 || state.endFrame <= state.startFrame || state.startFrame < generation.lastEnd) throw new Error('Invalid or overlapping subtitle timing.');
-                var clip = generation.sequence.importMGT(generation.templatePath, timeAtTicks(state.startFrame * ticksPerFrame).ticks, generation.trackIndex, 0);
+                var at = timeAtTicks(state.startFrame * ticksPerFrame);
+                var track = generation.sequence.videoTracks[generation.trackIndex];
+                var clip;
+                if (!generation.projectItem) {
+                    clip = generation.sequence.importMGT(generation.templatePath, at.ticks, generation.trackIndex, 0);
+                    if (clip) generation.projectItem = clip.projectItem;
+                    if (!generation.projectItem) throw new Error('The imported template cannot be reused. Generation stopped instead of repeating imports.');
+                } else {
+                    var before = track.clips.numItems;
+                    track.overwriteClip(generation.projectItem, at.seconds);
+                    if (track.clips.numItems !== before + 1) throw new Error('Premiere could not create a separate reused subtitle instance.');
+                    clip = track.clips[track.clips.numItems - 1];
+                }
                 if (!clip) throw new Error('Premiere could not insert the next subtitle.');
+                if (Math.abs(clip.start.seconds - at.seconds) > ticksPerFrame / 254016000000 / 4) throw new Error('Premiere placed the reused subtitle at an unexpected time.');
                 clip.end = timeAtTicks(state.endFrame * ticksPerFrame);
-                configureGraphic(clip, state.text);
+                configureGraphic(clip, state.text, generation.appearance);
                 clip.name = 'Subtitle ' + (state.phraseIndex + 1) + ': ' + state.text;
                 generation.lastEnd = state.endFrame;
                 generation.count++;
@@ -213,11 +254,11 @@ var YTSubtitle = (function () {
         return properties;
     }
 
-    function captureStyle() {
+    function captureStyle(source) {
         savedStyle = null;
         try {
             var current = context();
-            var selection = app.project.activeSequence.getSelection();
+            var selection = source ? [source] : app.project.activeSequence.getSelection();
             if (selection.length !== 1) throw new Error('Select one subtitle graphic as the style source.');
             var properties = graphicProperties(selection[0]);
             var text = JSON.parse(properties.getParamForDisplayName('Text').getValue());
@@ -278,6 +319,44 @@ var YTSubtitle = (function () {
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
+    var parent = null;
+    function setParentFromPlayhead() {
+        parent = null;
+        try {
+            var current = context(), sequence = app.project.activeSequence;
+            var seconds = sequence.getPlayerPosition().seconds;
+            var matches = [], selection = sequence.getSelection();
+            for (var t = 0; t < sequence.videoTracks.numTracks; t++) {
+                var clips = sequence.videoTracks[t].clips;
+                for (var i = 0; i < clips.numItems; i++) if (/^Subtitle \d+: /.test(clips[i].name) && clips[i].start.seconds <= seconds && clips[i].end.seconds > seconds) matches.push(clips[i]);
+            }
+            if (!matches.length) throw new Error('Move the playhead over a generated subtitle graphic.');
+            var candidate = matches.length === 1 ? matches[0] : null;
+            if (!candidate && selection.length === 1) for (var j = 0; j < matches.length; j++) if (matches[j].nodeId === selection[0].nodeId) candidate = matches[j];
+            if (!candidate) throw new Error('Multiple subtitle graphics are under the playhead. Select one of them, then set the parent.');
+            var captured = JSON.parse(captureStyle(candidate));
+            if (!captured.ok) throw new Error(captured.error);
+            parent = { context: current, nodeId: candidate.nodeId, name: candidate.name };
+            return JSON.stringify({ ok: true, parentName: candidate.name, note: 'Parent set: ' + candidate.name + '. Sync selected reads its latest style.' });
+        } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) }); }
+    }
+
+    function syncSelectedToParent() {
+        try {
+            var current = context();
+            if (!parent || current.sequenceId !== parent.context.sequenceId || current.projectPath !== parent.context.projectPath) throw new Error('Set a parent in this sequence first.');
+            var source = null, sequence = app.project.activeSequence;
+            for (var t = 0; t < sequence.videoTracks.numTracks; t++) {
+                var clips = sequence.videoTracks[t].clips;
+                for (var i = 0; i < clips.numItems; i++) if (clips[i].nodeId === parent.nodeId) source = clips[i];
+            }
+            if (!source) throw new Error('The parent graphic was removed. Set another parent.');
+            var captured = JSON.parse(captureStyle(source));
+            if (!captured.ok) throw new Error(captured.error);
+            return applyStyle();
+        } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) }); }
+    }
+
     function selectedPhrase() {
         var sequence = app.project.activeSequence;
         var selection = sequence.getSelection();
@@ -327,5 +406,5 @@ var YTSubtitle = (function () {
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
-    return { inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, readPhrase: readPhrase, updatePhrase: updatePhrase };
+    return { inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase };
 }());

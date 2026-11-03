@@ -6,14 +6,15 @@ const vm = require('node:vm');
 function host({ unsupportedText = false, failInsertAt = -1, templateExists = true, withoutJson = false, timebase = '8467200000' } = {}) {
   const original = { name: 'Original edit', sequenceID: 'original', importMGT() { assert.fail('must not insert into the original sequence'); } };
   const created = [];
+  const imported = [];
   const project = { rootItem: {}, activeSequence: original,
     createNewSequence() { assert.fail('interactive sequence creation must not be used'); },
     openSequence() { return true; },
     newSequence(name, presetPath) {
     project.lastPresetPath = presetPath;
-    const sequence = { name, sequenceID: 'proof', timebase, importMGT(path, ticks, trackIndex) {
+    function makeClip(path, ticks, trackIndex) {
       if (created.length === failInsertAt) return null;
-      let text = unsupportedText ? 'unsupported data' : JSON.stringify({ textEditValue: 'Template', fontEditValue: ['Heebo'], fontTextRunLength: [8] });
+      let text = unsupportedText ? 'unsupported data' : JSON.stringify({ textEditValue: 'Template', fontEditValue: ['Heebo'], fontSizeEditValue: [85], fontTextRunLength: [8] });
       const controls = {
         Text: { getValue: () => text, setValue(value) { text = value; } },
         Animation: { setValue(value) { this.value = value; } },
@@ -25,21 +26,24 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
         'Box Opacity': { setValue(value) { this.value = value; } },
       };
       for (const name of ['Characters Per Line', 'Offset', 'Size', 'Anchor Y', 'Line Spacing', 'Character Spacing', 'Word Spacing', 'Stroke Width', 'Active Word Stroke On/Off', 'Box Padding', 'Box Offset', 'Box Stroke Width', 'Box Roundness']) controls[name] = { value: 1, setValue(value) { this.value = value; } };
+      controls.Size.value = [100/1920,100/1080];
       for (const name of ['Fill Color', 'Stroke Color', 'Active Word Color', 'Box Fill', 'Box Stroke']) controls[name] = { value: [1,255,255,255], getColorValue() { return this.value; }, setColorValue(a,r,g,b) { this.value = [a,r,g,b]; } };
       for (const control of Object.values(controls)) {
         control.isTimeVarying = () => false;
         if (!control.getValue) control.getValue = function() { return this.value; };
       }
-      const clip = { trackIndex, start: { seconds: Number(ticks) / 254016000000 }, inPoint: { seconds: 0 },
+      const clip = { nodeId: 'clip-' + created.length, projectItem: {}, trackIndex, start: { seconds: Number(ticks) / 254016000000 }, inPoint: { seconds: 0 },
         getMGTComponent: () => ({ properties: { getParamForDisplayName: name => controls[name] || null } }), controls,
       };
       created.push(clip);
       return clip;
-    } };
+    }
+    const sequence = { name, sequenceID: 'proof', timebase, importMGT(path, ticks, trackIndex) { imported.push(path); return makeClip(path, ticks, trackIndex); } };
     project.activeSequence = sequence;
-    sequence.videoTracks = { numTracks: 2, 0: { clips: { numItems: 0 } }, 1: { clips: created } };
+    sequence.videoTracks = { numTracks: 2, 0: { clips: { numItems: 0 } }, 1: { clips: created, overwriteClip(item, seconds) { return !!makeClip('reuse', String(seconds * 254016000000), 1); } } };
     Object.defineProperty(created, 'numItems', { configurable: true, get() { return created.length; } });
     sequence.getSelection = () => sequence.selection || [];
+    sequence.getPlayerPosition = () => ({ seconds: sequence.playhead || 0 });
     return sequence;
   } };
   const context = {
@@ -59,7 +63,7 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
     project.sequences[project.sequences.numSequences++] = copy;
     return true;
   };
-  return { api: context.YTSubtitle, project, created, original };
+  return { api: context.YTSubtitle, project, created, imported, original };
 }
 
 const options = { templatePath: 'test.mogrt', presetPath: 'test.sqpreset' };
@@ -223,4 +227,64 @@ test('copies source typography and controls only to selected graphics, preservin
   created[2].controls.Size.isTimeVarying = () => true;
   assert.equal(JSON.parse(api.applyStyle()).ok, false);
   assert.equal(created[1].controls.Text.getValue(), before);
+});
+
+test('imports the template once and reuses independently editable instances across batches', () => {
+  const { api, created, imported } = host();
+  const r = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  for (let i = 0; i < 3; i++) assert.equal(JSON.parse(api.insertBatch(r.sequenceId, [{ text: 'word' + i, phraseIndex: 0, startFrame: i * 30, endFrame: (i+1)*30 }])).ok, true);
+  assert.equal(imported.length, 1);
+  assert.deepEqual(created.map(c => JSON.parse(c.controls.Text.getValue()).textEditValue), ['word0', 'word1', 'word2']);
+});
+
+test('parent follows playhead and sync rereads the latest style without changing destination words', () => {
+  const { api, project, created } = host();
+  const r = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  api.insertBatch(r.sequenceId, [0,1,2].map(i => ({ text: 'word' + i, phraseIndex: i, startFrame: i*30, endFrame: (i+1)*30 })));
+  project.activeSequence.playhead = .5;
+  assert.equal(JSON.parse(api.setParentFromPlayhead()).ok, true);
+  const data = JSON.parse(created[0].controls.Text.getValue()); data.fontEditValue = ['Arial'];
+  created[0].controls.Text.setValue(JSON.stringify(data));
+  project.activeSequence.selection = [created[1]];
+  assert.equal(JSON.parse(api.syncSelectedToParent()).ok, true);
+  assert.deepEqual(JSON.parse(created[1].controls.Text.getValue()).fontEditValue, ['Arial']);
+  assert.equal(JSON.parse(created[1].controls.Text.getValue()).textEditValue, 'word1');
+  assert.deepEqual(JSON.parse(created[2].controls.Text.getValue()).fontEditValue, ['Heebo']);
+  project.activeSequence.sequenceID = 'other';
+  assert.equal(JSON.parse(api.syncSelectedToParent()).ok, false);
+});
+
+test('parent selection rejects gaps and ambiguous overlapping graphics', () => {
+  const { api, project, created } = host();
+  const r = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  api.insertBatch(r.sequenceId, [0,1].map(i => ({ text: 'word', phraseIndex: i, startFrame: i*30, endFrame: (i+1)*30 })));
+  project.activeSequence.playhead = 4;
+  assert.equal(JSON.parse(api.setParentFromPlayhead()).ok, false);
+  project.activeSequence.playhead = .5; created[1].start.seconds = 0;
+  assert.equal(JSON.parse(api.setParentFromPlayhead()).ok, false);
+  project.activeSequence.selection = [created[1]];
+  assert.equal(JSON.parse(api.setParentFromPlayhead()).ok, true);
+  created.pop();
+  assert.equal(JSON.parse(api.syncSelectedToParent()).ok, false);
+});
+
+test('preview appearance is applied consistently to each independently editable word graphic', () => {
+  const { api, created } = host();
+  const appearance = { font: 'ArialMT', size: 170, textColor: '#112233', highlightColor: '#abcdef', x: 25, y: 75, mode: 'reveal-highlight' };
+  const r = JSON.parse(api.beginGeneration({ ...options, appearance, sequenceId: 'original', projectPath: 'test.prproj' }));
+  assert.equal(r.ok, true);
+  assert.equal(JSON.parse(api.insertBatch(r.sequenceId, [0,1].map(i => ({ text: 'word' + i, phraseIndex: 0, startFrame: i*30, endFrame: (i+1)*30 })))).ok, true);
+  for (const clip of created) {
+    assert.deepEqual(JSON.parse(clip.controls.Text.getValue()).fontEditValue, ['ArialMT']);
+    assert.deepEqual(Array.from(clip.controls.Size.value), [200/1920,200/1080]);
+    assert.deepEqual(Array.from(clip.controls.Offset.value), [-.25,.25]);
+    assert.deepEqual(Array.from(clip.controls['Fill Color'].value), [1,17,34,51]);
+    assert.deepEqual(Array.from(clip.controls['Active Word Color'].value), [1,171,205,239]);
+  }
+});
+
+test('appearance is rejected before cloning if values are invalid', () => {
+  const { api, project } = host();
+  assert.equal(JSON.parse(api.beginGeneration({ ...options, appearance: { font: 'Arial', size: 999 }, sequenceId: 'original', projectPath: 'test.prproj' })).ok, false);
+  assert.equal(project.sequences.numSequences, 1);
 });
