@@ -4,11 +4,13 @@ An extension in development for editable animated subtitles in Premiere. The app
 
 ## Current status
 
-The first deliverable is a read-only UXP compatibility prototype targeting Premiere 26.2.2. It reads the active sequence's transcript and inspects a selected graphic's parameters. It does **not** generate subtitle graphics yet.
+The UXP compatibility prototype targeting Premiere 26.2.2 reads the active sequence's transcript and inspects a selected graphic's parameters. A separate CEP prototype has now generated editable word-reveal graphics. Automatic transcript-to-graphics generation is not implemented yet.
 
 [Load and run the prototype](prototype/README.md). [Compatibility findings and pending checks](docs/premiere-compatibility.md).
 
 A separate [CEP template proof](prototype/cep/README.md) tests creating three editable timed text states using an already installed MOGRT. Its development installer records the prior CEP developer setting. This proof is not the finished transcript-to-subtitles workflow.
+
+[Verified graphics result and rendered frames](docs/mogrt-proof.md).
 
 The documented UXP `MogrtText` API starts at 27.0, so a complete graphics implementation for 26.2.2 must not assume that API is available. Parameter inspection is diagnostic evidence, not proof that writing text works.
 

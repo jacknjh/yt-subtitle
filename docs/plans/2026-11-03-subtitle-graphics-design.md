@@ -18,6 +18,8 @@ Each interval starts at the corresponding spoken word and normally ends at the n
 
 The animation template must keep inactive words steady. Highlight changes are the first target. Moving-word effects require separate verification: cutting a clip is not itself an animation, and trimming may affect template animation timing.
 
+User clarification: cumulative word reveal is also a core requested style. Future words stay invisible until spoken, while previously spoken words remain visible. Keep the full phrase's layout fixed so revealing a word does not move existing words. Each interval therefore needs a progression value in addition to the phrase text; highlighting just the current word and revealing words cumulatively are distinct animation settings. The user accepts imperfect initial wording/timing and will correct the generated timeline graphics afterward.
+
 ## Phrase grouping
 
 Maximum characters counts spaces and punctuation and never splits a word. A word longer than the limit remains intact. Sentence boundaries and sufficiently long pauses may end a phrase early. Single-word mode is an explicit option, independent of character count. Preserve word timing through grouping.
