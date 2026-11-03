@@ -37,6 +37,8 @@ There are 19 local tests in total, including host-independent checks for source-
 
 ## Remaining work
 
+The following describes the original three-word proof. The subsequent [transcript generator](transcript-generator.md) implements transcript-driven timing, character grouping, selected style copying and phrase text updates; that page tracks current verification and limits.
+
 This is a fixed three-word proof. Automatic transcript-to-graphics generation, maximum characters per phrase, selected-graphic style copying, phrase-wide text updates, persisted sequence sessions, and production packaging remain unimplemented.
 
 The prefix technique is limited to a single line. Future multi-line support must preserve the full phrase layout rather than wrap each growing prefix independently. The production extension also needs a compatible user-supplied or redistributable default template and a verified integration between the UXP transcript reader and the graphics interface.

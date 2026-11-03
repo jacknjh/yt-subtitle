@@ -2,17 +2,31 @@
 <html lang="en"><head><meta charset="utf-8"><title>Subtitle Graphics Proof</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
 <style>
-  body { margin: 16px; background: #292929; color: #f5f5f5; font: 13px/1.5 sans-serif; }
-  h1 { font-size: 18px; }
-  button { padding: 8px 12px; margin: 0 8px 8px 0; background: #424242; color: #fff; border: 1px solid #aaa; border-radius: 4px; cursor: pointer; }
-  button:focus-visible { outline: 2px solid #9ccfff; outline-offset: 2px; }
-  button:disabled { cursor: default; opacity: .6; }
-  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+body { margin: 16px; background: #292929; color: #f5f5f5; font: 13px/1.5 sans-serif; }
+h1 { font-size: 18px; }
+button { padding: 8px 12px; margin: 0 8px 8px 0; background: #424242; color: #fff; border: 1px solid #aaa; border-radius: 4px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid #9ccfff; outline-offset: 2px; }
+button:disabled { cursor: default; opacity: .6; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+input { background: #1e1e1e; color: #f5f5f5; border: 1px solid #aaa; padding: 6px; }
+label { display: block; margin: 12px 0; }
+input[type=number] { width: 64px; }
 </style></head><body>
-<h1>Subtitle graphics proof</h1>
-<p>Create a separate three-second test sequence containing editable “I”, “I like”, and “I like this” graphics.</p>
-<button id="inspect">Inspect selected graphic</button><button id="create">Create three-word test</button>
-<p id="status" role="status" aria-live="polite">Ready. Creating the test adds a new sequence and leaves your existing edit intact.</p>
-<pre id="result" aria-label="Test result"></pre>
-<script src="config.js"></script><script src="main.js"></script>
+<h1>Subtitle graphics</h1>
+<p>Open your source sequence, then load its Premiere transcript JSON. No caption or SRT conversion is needed.</p>
+<button id="load">Load transcript JSON</button>
+<label>Characters per phrase <input id="characters" type="number" min="1" max="200" value="24"></label>
+<label><input id="single-word" type="checkbox"> Show one word at a time</label>
+<p id="summary">No transcript loaded.</p>
+<pre id="preview" aria-label="First five phrases"></pre>
+<button id="generate" disabled>Generate subtitle graphics</button><button id="cancel" disabled>Stop</button>
+<p id="status" role="status" aria-live="polite">Ready. Word reveal uses the installed Karaoke template. Keep phrases short for a single line.</p>
+<h2>Style selected graphics</h2>
+<p>Edit one graphic in Premiere's Properties panel, capture it here, then select the graphics to match. Copies typography, colors, position and template animation settings, preserving text and timing.</p>
+<button id="capture-style">Capture selected style</button><button id="apply-style">Apply to selected graphics</button>
+<h2>Correct a phrase</h2>
+<button id="read-phrase">Read selected phrase</button>
+<label for="phrase-text">Phrase text</label><textarea id="phrase-text" rows="3" style="width:100%;box-sizing:border-box;background:#1e1e1e;color:#f5f5f5"></textarea>
+<button id="update-phrase" disabled>Update phrase text</button>
+<script src="config.js"></script><script src="planner.js"></script><script src="main.js"></script>
 </body></html>

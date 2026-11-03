@@ -4,13 +4,15 @@ An extension in development for editable animated subtitles in Premiere. The app
 
 ## Current status
 
-The UXP compatibility prototype targeting Premiere 26.2.2 reads the active sequence's transcript and inspects a selected graphic's parameters. A separate CEP prototype has now generated editable word-reveal graphics. Automatic transcript-to-graphics generation is not implemented yet.
+The CEP panel now generates editable, word-timed MOGRT graphics from Premiere transcript JSON. It groups whole words by character limit (or shows one word at a time), duplicates the source sequence, and inserts growing phrase prefixes on an empty top video track. Generation runs in stoppable batches. A separate UXP panel reads the sequence transcript.
 
 [Load and run the prototype](prototype/README.md). [Compatibility findings and pending checks](docs/premiere-compatibility.md).
 
-A separate [CEP template proof](prototype/cep/README.md) tests creating three editable timed text states using an already installed MOGRT. Its development installer records the prior CEP developer setting. This proof is not the finished transcript-to-subtitles workflow.
+The [CEP panel](prototype/cep/README.md) also captures a selected graphic's style for application to the current selection, and updates the text across a selected generated phrase while retaining timeline boundaries. It uses an already installed Karaoke MOGRT in place; that template is not distributed. Its installer records the prior CEP developer setting.
 
-[Verified graphics result and rendered frames](docs/mogrt-proof.md).
+Automatic transfer between the transcript reader and generator is still missing. Current setup requires reading/saving JSON in the UXP panel, then loading it in the CEP panel. Sequence sessions and settings are not persisted. Single-line word reveal is supported; full-phrase layout with invisible future words and stable multiline wrapping remain pending.
+
+[Generator workflow and checks](docs/transcript-generator.md). [Earlier proof and rendered frames](docs/mogrt-proof.md).
 
 The documented UXP `MogrtText` API starts at 27.0, so a complete graphics implementation for 26.2.2 must not assume that API is available. Parameter inspection is diagnostic evidence, not proof that writing text works.
 
@@ -24,7 +26,7 @@ node --check prototype/main.js
 node --check prototype/probe.js
 ```
 
-These checks exercise diagnostic behavior with a simulated host. They do not validate Premiere compatibility or rendering.
+These checks exercise transcript parsing, grouping, host guards, selected style copying, phrase updates and panel behavior with a simulated host. Real Premiere checks are documented separately; tests do not establish cross-version compatibility.
 
 ## Design
 

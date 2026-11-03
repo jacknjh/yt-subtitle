@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
-$templatePath = Join-Path $env:APPDATA 'Adobe/Common/Motion Graphics Templates/Captioneer/Landscape/16•9 Karaoke Subtitles.mogrt'
+$templateName = '16' + [char]0x2022 + '9 Karaoke Subtitles.mogrt'
+$templatePath = Join-Path $env:APPDATA ('Adobe/Common/Motion Graphics Templates/Captioneer/Landscape/' + $templateName)
 $presetPath = 'C:/Program Files/Adobe/Adobe Premiere Pro 2026/Settings/SequencePresets/Legacy/Digital SLR/1080p/DSLR 1080p30.sqpreset'
 if (-not (Test-Path -LiteralPath $templatePath -PathType Leaf)) { throw 'The local Karaoke test template is missing. No installation changes made.' }
 if (-not (Test-Path -LiteralPath $presetPath -PathType Leaf)) { throw 'The local sequence preset is missing. No installation changes made.' }
@@ -20,7 +21,7 @@ if (-not (Test-Path -LiteralPath $statePath)) {
         ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding utf8
 }
 
-foreach ($file in @('index.html', 'main.js', 'host.jsx', '.debug')) {
+foreach ($file in @('index.html', 'main.js', 'planner.js', 'host.jsx', '.debug')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $installPath $file) -Force
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CSXS/manifest.xml') -Destination (Join-Path $installPath 'CSXS/manifest.xml') -Force

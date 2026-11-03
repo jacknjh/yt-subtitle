@@ -24,6 +24,12 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
         'Active Word Opacity': { setValue(value) { this.value = value; } },
         'Box Opacity': { setValue(value) { this.value = value; } },
       };
+      for (const name of ['Characters Per Line', 'Offset', 'Size', 'Anchor Y', 'Line Spacing', 'Character Spacing', 'Word Spacing', 'Stroke Width', 'Active Word Stroke On/Off', 'Box Padding', 'Box Offset', 'Box Stroke Width', 'Box Roundness']) controls[name] = { value: 1, setValue(value) { this.value = value; } };
+      for (const name of ['Fill Color', 'Stroke Color', 'Active Word Color', 'Box Fill', 'Box Stroke']) controls[name] = { value: [1,255,255,255], getColorValue() { return this.value; }, setColorValue(a,r,g,b) { this.value = [a,r,g,b]; } };
+      for (const control of Object.values(controls)) {
+        control.isTimeVarying = () => false;
+        if (!control.getValue) control.getValue = function() { return this.value; };
+      }
       const clip = { trackIndex, start: { seconds: Number(ticks) / 254016000000 }, inPoint: { seconds: 0 },
         getMGTComponent: () => ({ properties: { getParamForDisplayName: name => controls[name] || null } }), controls,
       };
@@ -31,6 +37,9 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
       return clip;
     } };
     project.activeSequence = sequence;
+    sequence.videoTracks = { numTracks: 2, 0: { clips: { numItems: 0 } }, 1: { clips: created } };
+    Object.defineProperty(created, 'numItems', { configurable: true, get() { return created.length; } });
+    sequence.getSelection = () => sequence.selection || [];
     return sequence;
   } };
   const context = {
@@ -41,6 +50,15 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
   context.$ = { fileName: require.resolve('../prototype/cep/host.jsx'), evalFile(path) { vm.runInContext(fs.readFileSync(path, 'utf8'), context); } };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(require.resolve('../prototype/cep/host.jsx'), 'utf8'), context);
+  original.timebase = timebase;
+  original.videoTracks = { numTracks: 2, 0: { clips: { numItems: 0 } }, 1: { clips: { numItems: 0 } } };
+  project.path = 'test.prproj';
+  project.sequences = { 0: original, numSequences: 1 };
+  original.clone = () => {
+    const copy = project.newSequence('copy', 'unused');
+    project.sequences[project.sequences.numSequences++] = copy;
+    return true;
+  };
   return { api: context.YTSubtitle, project, created, original };
 }
 
@@ -62,6 +80,8 @@ test('creates three adjacent editable word states while preserving template typo
     assert.equal(clip.controls.Animation.value, false);
     assert.equal(clip.controls['Paragraph Alignment'].value, 2);
     assert.equal(clip.controls['Anchor X'].value, 0);
+    assert.equal(clip.controls['Characters Per Line'].value, 200);
+    assert.deepEqual(Array.from(clip.controls.Offset.value), [-.35, .3]);
     assert.equal(clip.controls['Type-On Opacity'].value, 100);
     assert.equal(clip.controls['Active Word Opacity'].value, 100);
     assert.equal(clip.controls['Box Opacity'].value, 0);
@@ -116,4 +136,91 @@ test('aligns adjacent word intervals to whole frames at 29.97 fps', () => {
   assert.equal(result.clips[0].end, result.clips[1].start);
   assert.equal(result.clips[1].end, result.clips[2].start);
   assert.equal(result.clips[2].end, 3.003);
+});
+
+test('generates timed words on a duplicate using an empty track and preserves the source', () => {
+  const { api, project, created, original } = host();
+  const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  assert.equal(result.ok, true);
+  assert.notEqual(project.activeSequence, original);
+  assert.equal(result.trackIndex, 1);
+  const inserted = JSON.parse(api.insertBatch(result.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 15, endFrame: 21 }]));
+  assert.equal(inserted.ok, true);
+  assert.equal(inserted.total, 1);
+  assert.equal(created[0].start.seconds, .5);
+  assert.equal(created[0].end.seconds, .7);
+  assert.equal(created[0].trackIndex, 1);
+});
+
+test('blocks stale sequence data and occupied output tracks before cloning', () => {
+  const { api, project, original } = host();
+  assert.equal(JSON.parse(api.beginGeneration({ ...options, sequenceId: 'wrong', projectPath: 'test.prproj' })).ok, false);
+  original.videoTracks[1].clips.numItems = 1;
+  const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  assert.equal(result.ok, false);
+  assert.match(result.error, /empty video track/);
+  assert.equal(project.sequences.numSequences, 1);
+  original.videoTracks[1].clips.numItems = 0;
+  original.videoTracks[0].clips = { 0: { name: 'Subtitle 1: existing' }, numItems: 1 };
+  const alreadyGenerated = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  assert.equal(alreadyGenerated.ok, false);
+  assert.match(alreadyGenerated.error, /original source/);
+  assert.equal(project.sequences.numSequences, 1);
+});
+
+test('stops generation when the active sequence changes and rejects invalid intervals', () => {
+  const { api, project, original, created } = host();
+  const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  project.activeSequence = original;
+  assert.equal(JSON.parse(api.insertBatch(result.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 0, endFrame: 1 }])).ok, false);
+  assert.equal(created.length, 0);
+  const next = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  assert.equal(JSON.parse(api.insertBatch(next.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 2, endFrame: 1 }])).ok, false);
+  assert.equal(created.length, 0);
+});
+
+test('updates all prefix graphics in the selected phrase without changing timing', () => {
+  const { api, project, created } = host();
+  const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  api.insertBatch(result.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 0, endFrame: 15 }, { text: 'Hello world', phraseIndex: 0, startFrame: 15, endFrame: 30 }]);
+  project.activeSequence.selection = [created[0]];
+  const phrase = JSON.parse(api.readPhrase());
+  assert.equal(phrase.text, 'Hello world');
+  assert.equal(JSON.parse(api.updatePhrase({ ...phrase, text: 'Hi everyone' })).ok, true);
+  assert.deepEqual(created.map(c => JSON.parse(c.controls.Text.getValue()).textEditValue), ['Hi', 'Hi everyone']);
+  assert.deepEqual(created.map(c => [c.start.seconds, c.end.seconds]), [[0, .5], [.5, 1]]);
+  assert.equal(JSON.parse(api.updatePhrase({ ...phrase, text: 'too many new words' })).ok, false);
+  assert.equal(JSON.parse(created[1].controls.Text.getValue()).textEditValue, 'Hi everyone');
+  created[1].start.seconds = .1;
+  assert.equal(JSON.parse(api.readPhrase()).ok, false);
+  assert.equal(JSON.parse(api.updatePhrase({ ...phrase, text: 'Hello again' })).ok, false);
+  assert.equal(JSON.parse(created[1].controls.Text.getValue()).textEditValue, 'Hi everyone');
+});
+
+test('copies source typography and controls only to selected graphics, preserving their words', () => {
+  const { api, project, created } = host();
+  const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  api.insertBatch(result.sequenceId, [0,1,2].map(i => ({ text: 'word' + i, phraseIndex: i, startFrame: i * 30, endFrame: (i+1) * 30 })));
+  const data = JSON.parse(created[0].controls.Text.getValue());
+  data.fontEditValue = ['Arial'];
+  created[0].controls.Text.setValue(JSON.stringify(data));
+  created[0].controls.Offset.value = [.1, .2];
+  created[0].controls['Fill Color'].value = [1,10,20,30];
+  project.activeSequence.selection = [created[0]];
+  assert.equal(JSON.parse(api.captureStyle()).ok, true);
+  project.activeSequence.selection = [created[1]];
+  assert.equal(JSON.parse(api.applyStyle()).ok, true);
+  assert.deepEqual(JSON.parse(created[1].controls.Text.getValue()).fontEditValue, ['Arial']);
+  assert.equal(JSON.parse(created[1].controls.Text.getValue()).textEditValue, 'word1');
+  assert.deepEqual(created[1].controls.Offset.value, [.1, .2]);
+  assert.deepEqual(Array.from(created[1].controls['Fill Color'].value), [1,10,20,30]);
+  assert.deepEqual(JSON.parse(created[2].controls.Text.getValue()).fontEditValue, ['Heebo']);
+  project.activeSequence.selection = [created[1], created[2]];
+  const different = JSON.parse(created[1].controls.Text.getValue());
+  different.fontEditValue = ['Courier'];
+  created[1].controls.Text.setValue(JSON.stringify(different));
+  const before = created[1].controls.Text.getValue();
+  created[2].controls.Size.isTimeVarying = () => true;
+  assert.equal(JSON.parse(api.applyStyle()).ok, false);
+  assert.equal(created[1].controls.Text.getValue(), before);
 });
