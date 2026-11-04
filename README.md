@@ -1,16 +1,34 @@
-# Subtitle Generator
+<p align="center">
+  <img src="assets/readme/mark.svg" width="80" height="80" alt="Subtitle Generator: growing word states on a timeline.">
+</p>
 
-Turn a Premiere transcript into editable, word-timed subtitle graphics on your timeline. Words appear as you speak, with optional highlighting of the current word.
+<h1 align="center">Subtitle Generator</h1>
 
-**Windows · Tested on Premiere Pro 26.2.2 · Local development build**
+<p align="center">
+  <strong>Your transcript. Your style. Editable on the timeline.</strong><br>
+  Word-timed subtitle graphics for Premiere Pro, with reveal and optional highlighting.
+</p>
 
-[Get started](#get-started) · [Everyday workflow](#everyday-workflow) · [Compatibility](#compatibility) · [Limits](#limits)
+<p align="center">
+  <a href="#compatibility"><img src="assets/readme/badge-platform.svg" height="28" alt="Windows"></a>
+  <a href="#compatibility"><img src="assets/readme/badge-tested.svg" height="28" alt="Tested on Premiere Pro 26.2.2"></a>
+  <a href="#get-started"><img src="assets/readme/badge-build.svg" height="28" alt="Local development build"></a>
+</p>
+
+<p align="center">
+  <a href="#get-started"><strong>🚀&nbsp;Get&nbsp;started</strong></a> &nbsp;·&nbsp;
+  <a href="#everyday-workflow"><strong>🎛️&nbsp;Workflow</strong></a> &nbsp;·&nbsp;
+  <a href="#compatibility"><strong>🧩&nbsp;Compatibility</strong></a> &nbsp;·&nbsp;
+  <a href="#limits"><strong>📌&nbsp;Limits</strong></a>
+</p>
+
+---
 
 <p align="center">
   <img src="assets/readme/style-panel.png" width="360" alt="Subtitle Generator running in Premiere: pinned phrase preview, collapsible style groups, editable color fields, and Generate and Pause controls.">
 </p>
 
-*Actual CEP panel. The preview is approximate; Premiere's rendered graphics are the final reference.*
+<p align="center"><sub>Actual CEP panel. Approximate preview; Premiere's rendered graphics are the final reference.</sub></p>
 
 ## From transcript to timeline
 
