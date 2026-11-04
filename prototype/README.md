@@ -1,6 +1,6 @@
 # Transcript reader and compatibility diagnostics
 
-For normal use, run `./prototype/cep/install-dev.ps1 -InstallReader` from the repository root, save your project and restart Premiere once. **Subtitle Generator Reader** starts in the background; the CEP Subtitle Generator reads its local request/reply files automatically. Developer Tools are only needed for the diagnostic/development setup below. The reader writes heartbeat/request/reply files inside its own plugin-data folder; it does not modify the project.
+For normal use, run the root `Install.cmd` or `./Install.ps1`, save your project and restart Premiere once. See [installation instructions](../INSTALL.md). **Subtitle Generator Reader** starts in the background; the CEP Subtitle Generator reads its local request/reply files automatically. Developer Tools are only needed for the diagnostic/development setup below. The reader writes heartbeat/request/reply files inside its own plugin-data folder; it does not modify the project.
 
 This panel reads Premiere data. It does not insert, trim, delete, or modify timeline items. Diagnostic exports are written only when you choose Save; background transfer uses private plugin-data files. No network connection is used by the panel.
 

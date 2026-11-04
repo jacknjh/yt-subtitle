@@ -9,9 +9,9 @@ Updated November 5, 2026. **Premiere Pro 26.2.2 on Windows is the only tested ho
 | [CEP panel manifest](../prototype/cep/CSXS/manifest.xml) | PPRO `[26.2,27.0)`, CSXS 12.0 | Declares loading eligibility from 26.2 through versions below 27.0. |
 | [UXP reader manifest](../prototype/manifest.json) | Premiere minimum 26.2.2; startup load event | Requires at least 26.2.2 for the installed reader. |
 | Combined workflow | 26.2.2 up to, excluding, 27.0 | Manifest intersection only; other builds have not been tested. |
-| [Windows installer](../prototype/cep/install-dev.ps1) | Premiere 2026 preset and a locally installed Karaoke MOGRT at fixed paths | The current installer is specific to this Windows setup. |
+| [Windows installer](../prototype/cep/install-dev.ps1) | Detects Premiere from running instances/standard folders; allows explicit paths or file pickers; checks compatible MOGRT controls | Windows only. Template is supplied separately; structure validation is not a render-compatibility test. |
 
-The installed host reports product version 26.2.2 and executable file version 26.2.2.3. The inspected UXP runtime was `uxp-9.2.1-local`. No claim is made for other 26.x builds, Premiere 27.x, earlier releases or macOS. Widening a manifest does not verify host APIs, paths, template behavior or startup.
+The installed host reports product version 26.2.2 and executable file version 26.2.2.3. The inspected UXP runtime was `uxp-9.2.1-local`. No claim is made for other 26.x builds, Premiere 27.x, earlier releases or macOS. Widening a manifest does not verify host APIs, template behavior or startup. The portable installer now resolves locations instead of requiring this machine's Premiere path; the optional sequence preset is used only by developer diagnostics.
 
 ## Verified on the tested host
 
@@ -46,7 +46,7 @@ On 26.2.2, the tested UXP Source Text accessors returned null or rejected altern
 - Recovery of an unfinished generation after restarting the panel or Premiere. Saved appearance persists; resume state and settings undo history do not.
 - Redistribution of a default template. The currently required third-party MOGRT is not bundled.
 
-The repository currently has **104 passing automated tests**. Simulated-host tests establish regression coverage, not compatibility with hosts that were never run.
+The repository currently has **105 passing automated tests**. Simulated-host tests establish regression coverage, not compatibility with hosts that were never run.
 
 ## When testing another version
 
@@ -59,3 +59,9 @@ Use a copy of a short project. Check reader startup, transcript refresh, three o
 - [Earlier MOGRT proof](mogrt-proof.md)
 - [Adobe Transcript API](https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/transcript)
 - [Adobe CEP example](https://github.com/Adobe-CEP/Samples/blob/master/PProPanel/jsx/PPRO/Premiere.jsx)
+
+## Portable installer and release build
+
+The root Install.cmd/Install.ps1 entry point installs the panel and reader using user-scoped paths. A compatible locally supplied MOGRT is required. The installer validates controls and version bounds before installation, records the prior CEP developer-mode setting and leaves saved sequence data intact. Normal installs do not enable the development debugger; developer installs can explicitly request it.
+
+The release builder creates a versioned ZIP and SHA-256 checksum using an explicit allowlist. Regression checks cover invalid/missing templates, retained template choices, version bounds, excluded template/private/debug files and the checksum. Local preflight is read-only. Fresh-machine installation and other Premiere builds remain unverified; the package contains no MOGRT and requires a compatible template supplied separately.

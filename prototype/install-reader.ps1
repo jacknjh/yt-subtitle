@@ -1,6 +1,6 @@
 param([switch]$PackageOnly)
 $ErrorActionPreference = 'Stop'
-$readerInstaller = 'C:/Program Files/Common Files/Adobe/Adobe Desktop Common/RemoteComponents/UPI/UnifiedPluginInstallerAgent/UnifiedPluginInstallerAgent.exe'
+$readerInstaller = Join-Path $env:CommonProgramFiles 'Adobe/Adobe Desktop Common/RemoteComponents/UPI/UnifiedPluginInstallerAgent/UnifiedPluginInstallerAgent.exe'
 if (-not $PackageOnly -and -not (Test-Path -LiteralPath $readerInstaller)) { throw 'Adobe Unified Plugin Installer Agent is missing. Install Creative Cloud Desktop to install the transcript reader.' }
 $readerManifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'manifest.json') -Raw | ConvertFrom-Json
 if (-not $PackageOnly) {

@@ -40,19 +40,22 @@ Earlier words remain visible as a phrase grows. **Default** alignment reserves t
 
 ## Get started
 
-The current installer targets the tested Windows setup. It requires a separately installed compatible landscape subtitle MOGRT and the Premiere 2026 sequence preset at the paths in [install-dev.ps1](prototype/cep/install-dev.ps1). The template is not included in this repository; an arbitrary MOGRT is not a drop-in replacement.
+The installer supports Windows and requires Premiere plus Adobe Creative Cloud Desktop. A compatible subtitle MOGRT must be supplied separately and kept installed. The template is not bundled. The generator expects a specific set of exposed text and layout controls, so an arbitrary MOGRT is not a drop-in replacement.
 
-From the repository root in PowerShell:
+Download or clone this repository, extract it to a folder, then double-click **Install.cmd**. The installer detects Premiere and an existing compatible template selection. If either location is missing, a file picker lets you choose it. It checks required template controls before changing the installation.
+
+From PowerShell, you can also run:
 
 ```powershell
-./prototype/cep/install-dev.ps1 -InstallReader
+./Install.ps1
+./Install.ps1 -WhatIf
 ```
 
-Adobe Creative Cloud Desktop's plugin installer is needed for the background reader. Node.js is optional for installation, but enables scanning your installed fonts; without it, standard font choices remain.
+`-WhatIf` runs prerequisite checks without installing or changing the registry. Custom locations can be supplied with `-TemplatePath` and `-PremierePath`. Node.js is optional; it enables scanning your installed fonts, while standard choices remain without it.
 
-Save your project and restart Premiere once after installation. Then open **Window → Extensions → Subtitle Generator**. The installed transcript reader starts with Premiere; you do not need to open UXP Developer Tools for everyday use.
+Save your project and restart Premiere once after installation. Open **Window → Extensions → Subtitle Generator**. The installed transcript reader starts with Premiere; UXP Developer Tools is not needed for everyday use. The selected MOGRT must remain on disk.
 
-For later panel-only updates, run the installer without `-InstallReader`, then reopen Premiere. Installation details and uninstall instructions are in the [panel guide](prototype/cep/README.md).
+For an update, extract the newer files and rerun Install.cmd. The reader installer skips an already-installed matching version. See [installation and uninstall instructions](INSTALL.md), or the [developer panel guide](prototype/cep/README.md).
 
 ## Everyday workflow
 
@@ -79,7 +82,7 @@ Settings and transcript snapshots are remembered per project and sequence. Autom
 | Other eligible 26.x builds | Untested. The combined manifest range is **26.2.2 up to, but excluding, 27.0**. Loading eligibility is not verified compatibility. |
 | Premiere 27.x, older releases, macOS | Not supported by the current installer/manifests or not tested. |
 
-There is no exact-version lock to 26.2.2. It is the only tested build. Keep using the installed setup; check a short sequence before adopting a Premiere update. The installer also contains Windows and Premiere-2026-specific paths, so a wider manifest alone would not make another setup supported.
+There is no exact-version lock to 26.2.2. It is the only tested build. Keep using the installed setup; check a short sequence before adopting a Premiere update. The installer detects Premiere's location, but its APIs and the selected template still need testing on each additional build. A wider manifest alone would not establish compatibility.
 
 See the [compatibility record](docs/premiere-compatibility.md) for the evidence and remaining checks.
 
@@ -90,7 +93,7 @@ See the [compatibility record](docs/premiere-compatibility.md) for the evidence 
 - **Phrase corrections retain clip boundaries.** Read a selected generated phrase, edit its text, then update. Duplicate or delete word graphics first if changing the word count.
 - **The template and preview have defined scope.** The tested template is landscape; portrait layouts and arbitrary MOGRTs are unverified. Local-font measurements can differ slightly from Premiere. There is no text-shadow toggle or automatic per-word pop.
 
-This is usable on the tested setup, with a template dependency and development installer. Broader distribution still needs portable installation and more host testing.
+This is usable on the tested setup, with a template dependency and development installer. A portable Windows installer and a local release builder are included. A self-contained template and more host testing remain necessary for broader support.
 
 ## Verification and development
 
@@ -100,9 +103,17 @@ Node.js 20 or later; no package installation required:
 npm test
 ```
 
-**104 tests pass** across parsing, grouping, sequence identity, generation guards, pause/resume, phrase updates, parent style copying and panel behavior. Live checks also cover rendered alignment and two-line reveal, keyboard undo, pinned preview, 64 layout combinations and automated accessibility audits. These checks do not establish cross-version compatibility or screen-reader support.
+**105 tests pass** across parsing, grouping, sequence identity, generation guards, pause/resume, phrase updates, parent style copying and panel behavior. Live checks also cover rendered alignment and two-line reveal, keyboard undo, pinned preview, 64 layout combinations and automated accessibility audits. These checks do not establish cross-version compatibility or screen-reader support.
 
 - [Workflow and native verification](docs/transcript-generator.md)
 - [UI review and current findings](docs/ui-polish-review.md)
 - [Compatibility record](docs/premiere-compatibility.md)
 - [Reader diagnostics](prototype/README.md)
+
+## Build a release
+
+```powershell
+./scripts/package-release.ps1
+```
+
+This builds a versioned Windows ZIP and SHA-256 checksum in `dist/`, using an explicit allowlist of installer, panel and reader files. It includes no MOGRT, font files, user data, local configuration or development debugger. Versioned packages are local build artifacts until published as a GitHub Release. The package's README explains the separate-template requirement.
