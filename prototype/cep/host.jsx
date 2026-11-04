@@ -2,7 +2,7 @@ var YTSubtitle = (function () {
     function initialize(extensionPath) {
         // The first manifest-loaded JSX cannot reliably use $.fileName to locate its dependencies.
         if (typeof JSON === 'undefined') $.evalFile(new File(extensionPath + '/vendor/json2.js'));
-        if (typeof SubtitleAppearance === 'undefined') $.evalFile(new File(extensionPath + '/appearance.js'));
+        if (typeof SubtitleAppearance === 'undefined' || typeof SubtitleAppearance.anchorX !== 'function') $.evalFile(new File(extensionPath + '/appearance.js'));
         if (typeof SubtitleIdentity === 'undefined') $.evalFile(new File(extensionPath + '/identity.js'));
         if (typeof createSubtitleBridge === 'undefined') $.evalFile(new File(extensionPath + '/bridge.jsx'));
         if (!bridge) bridge = createSubtitleBridge(context);
@@ -47,6 +47,7 @@ var YTSubtitle = (function () {
         setControl(properties, 'Active Word Opacity', 100);
         setControl(properties, 'Box Opacity', 0);
         if (appearance) {
+            setControl(properties, 'Anchor X', SubtitleAppearance.anchorX(appearance.alignment));
             var data = JSON.parse(parameter.getValue());
             if (!data.fontEditValue || data.fontEditValue.length !== 1) throw new Error('The template font cannot be edited uniformly.');
             data.fontEditValue = [appearance.font];
@@ -408,7 +409,7 @@ var YTSubtitle = (function () {
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
-    return { apiVersion: 3, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
+    return { apiVersion: 4, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
         requestTranscript: function (context) { return bridge.requestTranscript(context); },
         pollTranscript: function (id) { return bridge.pollTranscript(id); },
         readSession: function (context) { return bridge.readSession(context); },

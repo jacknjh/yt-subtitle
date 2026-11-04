@@ -24,7 +24,7 @@ To fix a phrase, select one generated graphic and choose **Read selected phrase*
 
 ## Verification and remaining work
 
-89 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
+93 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
 
 Live style capture/application and phrase updates succeeded. The reloaded panel's Read selected phrase button populated `Hello, guys.` and enabled phrase editing. Final video frame exports showed `Hello,` followed by `Hello, guys.` in the lower part of the frame with the newest word highlighted. Existing source captions and the earlier native test title remain visible separately.
 
@@ -55,7 +55,8 @@ The canvas preview uses the same planned word intervals and settings, but browse
 | Preview phrase | Choose which grouped phrase to preview. |
 | Play preview / Pause preview | Animate or pause the approximate word reveal. |
 | Preview timing slider | Scrub the chosen phrase without creating timeline clips. |
-| Appearance controls | Choose font, size, colors, position and reveal with/without highlight for new generation. |
+| Appearance controls | Choose font, size, colors, position, Left/Center/Right alignment and reveal with/without highlight for new generation. |
+| Reset style | Apply Times New Roman, plain reveal and bottom-center appearance defaults; retain grouping and allow Undo. |
 | Generate subtitles | Create editable graphics directly in the active sequence using the chosen appearance. |
 | Pause | Finish the current batch and retain progress. |
 | Resume | Continue the unfinished run after returning to its timeline; preserve the original plan and style. |
@@ -115,3 +116,13 @@ Panel settings use per-timeline undo/redo histories for the lifetime of the open
 Style now gives the preview and controls independent scrolling. At widths 280/420 the preview is above the controls; at width 800 it is beside them. Live checks at heights 400 and 720 confirmed that the canvas position did not change when the settings scrolled to the bottom, its content retained a 16:9 ratio, the footer stayed visible and no horizontal overflow appeared. The preview pane can scroll internally on very short panels. Style’s own settings scroll position is retained across tab changes.
 
 Live keyboard checks passed for Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y, button undo, one undo for a multi-move drag, and native undo inside both a numeric input and the phrase textarea. Original user settings were restored. No timeline generation or graphic edits were performed for this change.
+
+## Default style and alignment, November 4
+
+New sequence styles default to Times New Roman, size 85, plain reveal, center alignment and a horizontal/vertical anchor of 50%/90%. Existing saved styles keep their previous appearance; legacy records without alignment are interpreted as left-aligned. Reset style applies the new default appearance and is undoable. It retains phrase grouping. The native template’s horizontal anchor and canvas text placement use matching left/center/right semantics. Alignment follows the currently visible growing phrase rather than a reserved full-phrase layout.
+
+Netflix’s [general positioning guidance](https://partnerhelp.netflixstudios.com/hc/en-us/articles/215758617-Timed-Text-Style-Guide-General-Requirements) supports center justification near the bottom/top. The exact 50%/90% anchor is our adjustable product default, not a measured industry statistic or universal delivery standard. Other aspect ratios, obstructing imagery and platform overlays still require an appropriate user-selected position.
+
+A live temporary 1920×1080 sequence generated three Times New Roman graphics using the production generator. Native readbacks confirmed the font, anchors 0/50/100 and offset [0,0.4]. Exported frame alpha bounds were left (960,941)–(1315,1019), center (782,941)–(1138,1019), and right (605,941)–(960,1019). The default centered caption therefore retained about 61 pixels below its visible glyphs. The temporary sequence was removed, and the user’s original timeline restored. The exported stills remained outside the repository. Live Reset style/Undo checks restored the user’s saved appearance.
+
+Automatic per-word pop and changing the timeline to two tracks were dropped after user feedback. Existing parent Sync handles static styling and does not copy manual animation keyframes. No keyframe-copying capability is claimed by this update.

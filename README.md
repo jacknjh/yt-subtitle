@@ -34,3 +34,5 @@ These checks exercise transcript parsing, grouping, host guards, selected style 
 
 - [Approved design](docs/plans/2026-11-03-subtitle-graphics-design.md)
 - [Implementation plan](docs/plans/2026-11-03-subtitle-graphics-implementation.md)
+
+New sequence styles default to Times New Roman, plain word reveal and a centered anchor at 50% horizontal / 90% vertical. Style offers Left/Center/Right alignment; Reset style applies the defaults to an existing sequence and is undoable. Saved styles remain intact. Animation keyframes are not copied by the current parent-sync operation.

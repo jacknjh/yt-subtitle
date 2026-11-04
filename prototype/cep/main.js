@@ -18,7 +18,7 @@ let settingsTimer;
 let pendingRun = null;
 let settingsHistory = null;
 const settingHistories = new Map();
-const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation'];
+const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation', 'alignment'];
 const tabIds = ['generate', 'style', 'edit', 'help'];
 let activeTab = 'generate';
 let styleScroll = 0;
@@ -50,7 +50,7 @@ function showTab(name, focus = false) {
 }
 
 function renderFonts() {
-  const select = element('font'), selected = select.value || 'Heebo-SemiBold';
+  const select = element('font'), selected = select.value || SubtitleAppearance.defaults().font;
   const query = element('font-search').value.trim().toLocaleLowerCase();
   const matches = fontCatalog.filter(font => [font.label, font.family, font.style, font.postscript].join(' ').toLocaleLowerCase().includes(query));
   const current = fontCatalog.find(font => font.postscript === selected) || { postscript: selected, label: selected };
@@ -62,12 +62,12 @@ function renderFonts() {
 }
 
 function appearance() {
-  return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color-hex').value.trim(), highlightColor: element('highlight-color-hex').value.trim(), x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value });
+  return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color-hex').value.trim(), highlightColor: element('highlight-color-hex').value.trim(), x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value, alignment: element('alignment').value });
 }
 
 function host(expression) {
   const root = window.__adobe_cep__.getSystemPath('extension');
-  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==3){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
+  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==4){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
   return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(bootstrap + expression, raw => {
     try {
       if (raw === 'EvalScript error.') throw new Error('Subtitle Generator could not connect to Premiere. Close and reopen this panel, then try again.');
@@ -91,6 +91,7 @@ function controls() {
   ['characters', 'single-word', 'font-search', 'text-color-hex', 'highlight-color-hex'].concat(appearanceIds).forEach(id => { element(id).disabled = busy || !settingsHistory; });
   element('undo-settings').disabled = busy || !settingsHistory || !settingsHistory.canUndo();
   element('redo-settings').disabled = busy || !settingsHistory || !settingsHistory.canRedo();
+  element('reset-style').disabled = busy || !settingsHistory;
 }
 
 function preview() {
@@ -141,7 +142,7 @@ function drawPreview() {
   const weight = /black|heavy/i.test(face) ? 900 : /extra.?bold/i.test(face) ? 800 : /semi.?bold|demi/i.test(face) ? 600 : /bold/i.test(face) ? 700 : /medium/i.test(face) ? 500 : /light/i.test(face) ? 300 : 400;
   ctx.font = (/italic|oblique/i.test(face) ? 'italic ' : '') + weight + ' ' + style.size + 'px "' + (font.family || style.font).replace(/["\\]/g, '') + '", sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  const x = style.x * 19.2, y = style.y * 10.8, text = SubtitleAppearance.splitHighlight(caption.text);
+  const x = style.x * 19.2 - ctx.measureText(caption.text).width * SubtitleAppearance.anchorX(style.alignment) / 100, y = style.y * 10.8, text = SubtitleAppearance.splitHighlight(caption.text);
   ctx.fillStyle = style.textColor; ctx.fillText(text.prefix, x, y);
   ctx.fillStyle = style.mode === 'reveal-highlight' ? style.highlightColor : style.textColor;
   ctx.fillText(text.word, x + ctx.measureText(text.prefix).width, y);
@@ -275,6 +276,14 @@ function updateAppearance(group) {
   catch (error) { stopPreview(); element('status').textContent = error.message; }
 }
 ['font-size', 'position-x', 'position-y'].forEach(id => attachSubtitleScrub(element(id), () => updateAppearance(id), finishSettingsEdit));
+element('reset-style').addEventListener('click', () => {
+  if (busy || !settingsHistory) return;
+  try {
+    applySettings({ appearance: SubtitleAppearance.defaults(), characters: Number(element('characters').value), singleWord: element('single-word').checked });
+    recordSettings('reset-style'); finishSettingsEdit(); queueSettingsSave();
+    element('status').textContent = 'Default style applied: Times New Roman, plain word reveal, bottom-center.';
+  } catch (error) { element('status').textContent = error.message; }
+});
 appearanceIds.filter(id => id !== 'text-color' && id !== 'highlight-color').forEach(id => {
   element(id).addEventListener('input', () => updateAppearance(id));
   element(id).addEventListener('change', () => { updateAppearance(id); finishSettingsEdit(); });
@@ -330,6 +339,7 @@ function applySettings(settings) {
   element('font').value = style.font; element('font-size').value = style.size;
   for (const [id, value] of [['text-color', style.textColor], ['highlight-color', style.highlightColor]]) { element(id).value = value; element(id + '-hex').value = value; element(id + '-hex').setAttribute('aria-invalid', 'false'); }
   element('position-x').value = style.x; element('position-y').value = style.y; element('animation').value = style.mode;
+  element('alignment').value = style.alignment;
   element('characters').value = settings.characters; element('single-word').checked = settings.singleWord;
   preview();
 }

@@ -351,3 +351,16 @@ test('appearance is rejected before writes if values are invalid', () => {
   assert.equal(JSON.parse(api.beginGeneration({ ...options, appearance: { font: 'Arial', size: 999 }, sequenceId: 'original', projectPath: 'test.prproj' })).ok, false);
   assert.equal(project.sequences.numSequences, 1);
 });
+
+test('phrase alignment writes the supported template anchor and bottom-center defaults', () => {
+  const appearance = require('../prototype/cep/appearance');
+  for (const alignment of ['left', 'center', 'right']) {
+    const { api, created } = host();
+    const r = JSON.parse(api.beginGeneration({ ...options, appearance: { ...appearance.defaults(), alignment }, sequenceId: 'original', projectPath: 'test.prproj' }));
+    assert.equal(JSON.parse(api.insertBatch(r.sequenceId, [{ text: 'Example', phraseIndex: 0, startFrame: 0, endFrame: 30 }])).ok, true);
+    assert.equal(created[0].controls['Anchor X'].getValue(), appearance.anchorX(alignment));
+    assert.deepEqual(JSON.parse(created[0].controls.Text.getValue()).fontEditValue, ['TimesNewRomanPSMT']);
+    assert.deepEqual(Array.from(created[0].controls.Offset.getValue()), [0, .4]);
+    assert.deepEqual(Array.from(created[0].controls['Active Word Color'].getColorValue()), [1,235,235,235]);
+  }
+});

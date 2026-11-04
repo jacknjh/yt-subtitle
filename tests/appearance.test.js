@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { defaults, validate, captionAt, splitHighlight } = require('../prototype/cep/appearance');
+const { defaults, validate, captionAt, splitHighlight, anchorX } = require('../prototype/cep/appearance');
 test('ExtendScript dependencies register globally when loaded from a host method', () => {
   const fs = require('node:fs'), vm = require('node:vm');
   const context = vm.createContext({ $: { global: {} } });
@@ -16,6 +16,21 @@ test('validates appearance settings without sharing mutable defaults', () => {
   assert.throws(() => validate({ ...a, textColor: 'red' }), /color/);
   assert.throws(() => validate({ ...a, x: 101 }), /position/);
   assert.throws(() => validate({ ...a, mode: 'unknown' }), /reveal/);
+});
+
+test('new subtitle styles use Times New Roman, plain reveal and a bottom-center anchor', () => {
+  const a = defaults();
+  assert.equal(a.font, 'TimesNewRomanPSMT');
+  assert.equal(a.mode, 'reveal');
+  assert.equal(a.alignment, 'center');
+  assert.equal(a.x, 50); assert.equal(a.y, 90);
+  assert.deepEqual(['left', 'center', 'right'].map(anchorX), [0, 50, 100]);
+  assert.throws(() => validate({ ...a, alignment: 'unknown' }), /alignment/);
+});
+
+test('older saved styles retain their previous left alignment', () => {
+  const a = defaults(); delete a.alignment;
+  assert.equal(validate(a).alignment, 'left');
 });
 test('preview uses the same word intervals as timeline output and blanks gaps', () => {
   const clips = [{ startFrame: 5, endFrame: 10, text: 'Hello' }, { startFrame: 12, endFrame: 20, text: 'Hello guys' }];

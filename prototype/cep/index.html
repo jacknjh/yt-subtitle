@@ -118,9 +118,9 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <div class="preview-transport"><button id="preview-play" aria-pressed="false">Play preview</button><input id="preview-time" type="range" min="0" max="60" value="0" step="1" aria-label="Preview timing" title="Preview timing"></div>
 </div><div class="style-settings" id="style-settings" role="region" aria-label="Style settings" tabindex="0">
 <div class="control-section">
-<h2>Typography</h2>
+<div class="section-heading"><h2>Typography</h2><button id="reset-style" class="compact" title="Reset font, colors, position, alignment and word reveal to defaults">Reset style</button></div>
 <div class="field"><label for="font-search">Search fonts</label><input id="font-search" type="search" placeholder="Family or font face" autocomplete="off"></div>
-<div class="field"><label for="font">Font face</label><select id="font"><option value="Heebo-SemiBold">Heebo SemiBold</option><option value="ArialMT">Arial</option><option value="Arial-BoldMT">Arial Bold</option><option value="TimesNewRomanPSMT">Times New Roman</option></select></div>
+<div class="field"><label for="font">Font face</label><select id="font"><option value="Heebo-SemiBold">Heebo SemiBold</option><option value="ArialMT">Arial</option><option value="Arial-BoldMT">Arial Bold</option><option value="TimesNewRomanPSMT" selected>Times New Roman</option></select></div>
 <p id="font-status" class="muted" aria-live="polite"></p>
 <div class="field"><label for="font-size">Font size</label><input id="font-size" class="scrub-value" type="number" min="8" max="240" step="0.1" value="85" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
 <p id="scrub-hint" class="hint">Drag values left/right, or click to type. Shift for fine control.</p>
@@ -129,12 +129,14 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <div class="field"><span class="field-title" id="text-color-label">Text color</span><div class="color-row"><input id="text-color" type="color" value="#ebebeb" aria-labelledby="text-color-label" title="Choose text color"><input id="text-color-hex" type="text" value="#ebebeb" maxlength="7" spellcheck="false" aria-label="Text color hex value"></div></div>
 <div class="field"><span class="field-title" id="highlight-color-label">Highlight color</span><div class="color-row"><input id="highlight-color" type="color" value="#fffe00" aria-labelledby="highlight-color-label" title="Choose highlight color"><input id="highlight-color-hex" type="text" value="#fffe00" maxlength="7" spellcheck="false" aria-label="Highlight color hex value"></div></div>
 </div></div>
-<div class="control-section"><h2>Position</h2><div class="fields">
-<div class="field"><label for="position-x">Horizontal (%)</label><input id="position-x" class="scrub-value" type="number" min="0" max="100" step="0.1" value="15" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
-<div class="field"><label for="position-y">Vertical (%)</label><input id="position-y" class="scrub-value" type="number" min="0" max="100" step="0.1" value="80" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
+<div class="control-section"><h2>Position</h2>
+<div class="field"><label for="alignment">Phrase alignment</label><select id="alignment"><option value="left">Left</option><option value="center" selected>Center</option><option value="right">Right</option></select></div>
+<div class="fields">
+<div class="field"><label for="position-x">Horizontal (%)</label><input id="position-x" class="scrub-value" type="number" min="0" max="100" step="0.1" value="50" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
+<div class="field"><label for="position-y">Vertical (%)</label><input id="position-y" class="scrub-value" type="number" min="0" max="100" step="0.1" value="90" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
 </div></div>
 <div class="control-section"><h2>Animation</h2>
-<div class="field"><label for="animation">Word animation</label><select id="animation"><option value="reveal-highlight">Reveal + highlight</option><option value="reveal">Word reveal</option></select></div>
+<div class="field"><label for="animation">Word animation</label><select id="animation"><option value="reveal">Word reveal</option><option value="reveal-highlight">Reveal + highlight</option></select></div>
 <p class="hint">For new graphics. Use Edit to match existing graphics.</p></div>
 </div></div>
 </section>
@@ -162,6 +164,7 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <dt>Undo / Redo settings</dt><dd>Undo and Redo restore panel appearance and phrase grouping. Use Ctrl+Z to undo, Ctrl+Shift+Z or Ctrl+Y to redo. Each completed drag is one step. While typing, the focused field keeps its normal text undo. Histories stay separate for each timeline while this panel is open; timeline edits use Premiere's own undo history.</dd>
 <dt>Pinned preview</dt><dd>The preview stays above the scrolling controls in a narrow panel, or beside them in a wider panel. Premiere remains the final reference for spacing and rendering.</dd>
 <dt>Style and preview</dt><dd>Choose a phrase, play or scrub its timing, then adjust appearance. The preview is approximate and does not modify timeline graphics.</dd>
+<dt>Default style and alignment</dt><dd>New timelines start with Times New Roman, plain word reveal and a bottom-center anchor at 50% horizontal, 90% vertical. Left, Center and Right align the visible phrase around that horizontal position. Saved styles are retained; Reset style applies the new defaults and can be undone.</dd>
 <dt>Fonts and colors</dt><dd>Search local font faces, then choose one from the dropdown. Click a color swatch to open its picker, or type a six-digit hex color. New fonts appear after rerunning the panel installer.</dd>
 <dt>Drag numeric values</dt><dd>Drag font size or a position value left to decrease, right to increase. Hold Shift for fine adjustments. Escape cancels the drag. Click to type; press Enter or click elsewhere when finished. Arrow keys also adjust a focused field.</dd>
 </dl></div>

@@ -7,7 +7,7 @@ const SubtitleAppearance = require('../prototype/cep/appearance');
 
 function panel(respond) {
   const elements = {};
-  const initial = { characters: '24', font: 'Heebo-SemiBold', 'font-size': '85', 'text-color': '#ebebeb', 'highlight-color': '#fffe00', 'text-color-hex': '#ebebeb', 'highlight-color-hex': '#fffe00', 'position-x': '15', 'position-y': '80', animation: 'reveal-highlight' };
+  const initial = { characters: '24', font: 'TimesNewRomanPSMT', 'font-size': '85', 'text-color': '#ebebeb', 'highlight-color': '#fffe00', 'text-color-hex': '#ebebeb', 'highlight-color-hex': '#fffe00', 'position-x': '50', 'position-y': '90', animation: 'reveal', alignment: 'center' };
   const listeners = {};
   const document = { addEventListener(name, handler) { (listeners[name] ||= []).push(handler); }, createElement() { return {}; }, getElementById(id) {
     return elements[id] ||= { ownerDocument: document, value: initial[id] || '', checked: false, textContent: '', disabled: false, events: {}, setAttribute(key, value) { this[key] = value; }, focus() { this.focused = true; }, appendChild() {}, addEventListener(event, callback) { this.events[event] = callback; } };
@@ -38,7 +38,7 @@ test('generates in small batches, reports completion and restores controls', asy
   assert.equal(p.elements.cancel.disabled, true);
   assert.equal(p.elements['generation-progress'].value, 7);
   assert.equal(p.elements['generation-progress'].max, 7);
-  assert.match(p.calls[0], /"appearance":\{"font":"Heebo-SemiBold"/);
+  assert.match(p.calls[0], /"appearance":\{"font":"TimesNewRomanPSMT"/);
 });
 
 test('pausing keeps the frozen plan and resumes from the next unfinished word', async () => {
@@ -169,7 +169,7 @@ test('panel shortcuts undo settings while text editors retain native undo', () =
   p.key(event({ tagName: 'TEXTAREA' }));
   assert.equal(prevented, false); assert.equal(Number(p.elements['position-x'].value), 25);
   p.key(event({ tagName: 'BUTTON' }));
-  assert.equal(prevented, true); assert.equal(Number(p.elements['position-x'].value), 15);
+  assert.equal(prevented, true); assert.equal(Number(p.elements['position-x'].value), 50);
   p.key({ ...event({ tagName: 'BUTTON' }), shiftKey: true });
   assert.equal(Number(p.elements['position-x'].value), 25);
 });
@@ -230,7 +230,7 @@ test('hex color fields update the swatch and native picker changes update the he
 test('font search preserves the chosen font until a different face is selected', () => {
   const p = panel(() => ({ ok: true }));
   p.elements['font-search'].value = 'Example'; p.elements['font-search'].events.input();
-  assert.equal(p.elements.font.value, 'Heebo-SemiBold');
+  assert.equal(p.elements.font.value, 'TimesNewRomanPSMT');
   assert.match(p.elements['font-status'].textContent, /1 matching/);
   p.elements.font.value = 'Example-Bold'; p.elements.font.events.change();
   assert.match(p.elements.status.textContent, /Appearance updated/);
@@ -283,4 +283,19 @@ test('manual chooser remains usable when the automatic reader is unavailable', a
   await p.elements.load.events.click();
   assert.equal(p.elements.generate.disabled, false);
   assert.match(p.elements['transcript-source'].textContent, /Manual JSON snapshot/);
+});
+
+test('Reset style is undoable and preserves phrase grouping', () => {
+  const p = panel(() => ({ ok: true }));
+  p.elements.characters.value = '32'; p.elements.characters.events.change();
+  p.elements.font.value = 'ArialMT'; p.elements.font.events.change();
+  p.elements.alignment.value = 'right'; p.elements.alignment.events.change();
+  p.elements['reset-style'].events.click();
+  assert.equal(p.elements.font.value, 'TimesNewRomanPSMT');
+  assert.equal(p.elements.alignment.value, 'center');
+  assert.equal(p.elements.animation.value, 'reveal');
+  assert.equal(p.elements.characters.value, 32);
+  p.elements['undo-settings'].events.click();
+  assert.equal(p.elements.font.value, 'ArialMT');
+  assert.equal(p.elements.alignment.value, 'right');
 });
