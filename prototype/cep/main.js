@@ -15,6 +15,7 @@ let transcriptReading = false;
 let manualChoosing = false;
 let transcriptError = '';
 let settingsTimer;
+let pendingRun = null;
 const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation'];
 const tabIds = ['generate', 'style', 'edit', 'help'];
 let activeTab = 'generate';
@@ -60,7 +61,7 @@ function appearance() {
 
 function host(expression) {
   const root = window.__adobe_cep__.getSystemPath('extension');
-  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==2){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
+  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==3){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
   return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(bootstrap + expression, raw => {
     try {
       if (raw === 'EvalScript error.') throw new Error('Subtitle Generator could not connect to Premiere. Close and reopen this panel, then try again.');
@@ -76,7 +77,8 @@ function argument(value) { return JSON.stringify(value).replace(/\u2028/g, '\\u2
 function controls() {
   ['load', 'characters', 'single-word', 'capture-style', 'read-phrase', 'phrase-text', 'preview-play', 'preview-time', 'preview-phrase', 'font-search', 'text-color-hex', 'highlight-color-hex'].concat(appearanceIds).forEach(id => { element(id).disabled = busy; });
   element('apply-style').disabled = busy || !parentReady;
-  element('generate').disabled = busy || transcriptReading || !loaded || !transcriptFresh;
+  element('generate').disabled = busy || !!pendingRun || transcriptReading || !loaded || !transcriptFresh;
+  ['resume', 'discard-run'].forEach(id => { element(id).hidden = !pendingRun; element(id).disabled = busy || !pendingRun; });
   element('refresh-transcript').disabled = busy || transcriptReading;
   element('cancel').disabled = !generating;
   element('update-phrase').disabled = busy || !phraseSnapshot;
@@ -163,7 +165,7 @@ element('load').addEventListener('click', async () => {
   try {
     const result = await host('YTSubtitle.loadTranscript()');
     if (!result.cancelled) await sessions.manual(result.json, result.context);
-    else element('status').textContent = 'No JSON file selected. Choose an exported transcript JSON file; the panel does not read Premiere’s transcript automatically.';
+    else element('status').textContent = 'No JSON file selected. Refresh from Premiere to read the current transcript, or choose an exported JSON file.';
   } catch (error) { element('status').textContent = error.message; }
   finally { busy = false; manualChoosing = false; controls(); }
 });
@@ -173,37 +175,62 @@ element('load').addEventListener('click', async () => {
   catch (error) { element('status').textContent = error.message; }
 }));
 
-element('cancel').addEventListener('click', () => { cancelled = true; element('status').textContent = 'Stopping after the current batch…'; });
+element('cancel').addEventListener('click', () => { cancelled = true; element('status').textContent = 'Pausing after the current batch…'; });
 
+async function continueGeneration() {
+  const run = pendingRun;
+  if (!run) return;
+  busy = true; generating = true; cancelled = false; controls();
+  let note = '';
+  try {
+    while (run.inserted < run.clips.length && !cancelled) {
+      element('status').textContent = 'Creating editable graphics in “' + run.sequenceName + '”: ' + run.inserted + ' / ' + run.clips.length + '. You can pause after this batch.';
+      const end = Math.min(run.inserted + 5, run.clips.length);
+      const batch = await host('YTSubtitle.insertBatch(' + argument(run.sequenceId) + ',' + argument(run.clips.slice(run.inserted, end)) + ')');
+      if (!Number.isInteger(batch.total) || batch.total < run.inserted || batch.total > end || (!batch.paused && batch.total === run.inserted)) throw new Error('Premiere returned unexpected generation progress.');
+      run.inserted = batch.total;
+      element('generation-progress').value = run.inserted;
+      element('progress-label').textContent = run.inserted + ' / ' + run.clips.length + ' graphics, ' + ((Date.now() - run.started) / 1000).toFixed(1) + ' seconds since starting';
+      if (batch.paused) { note = batch.note || ''; break; }
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    if (run.inserted === run.clips.length) {
+      element('status').textContent = 'Done. ' + run.inserted + ' editable graphics in “' + run.sequenceName + '”.';
+      pendingRun = null;
+    } else {
+      const message = 'Paused at ' + run.inserted + ' / ' + run.clips.length + ' in “' + run.sequenceName + '”. ' + (note || 'Return to this timeline and press Resume.');
+      element('status').textContent = message; element('progress-label').textContent = message;
+    }
+  } catch (error) {
+    pendingRun = null;
+    element('status').textContent = error.message + ' Partial graphics remain in “' + run.sequenceName + '”. Check that track before starting again.';
+  } finally { busy = false; generating = false; controls(); }
+}
+
+element('resume').addEventListener('click', () => { if (!busy) return continueGeneration(); });
+element('discard-run').addEventListener('click', () => {
+  if (busy || !pendingRun) return;
+  pendingRun = null;
+  element('status').textContent = 'Run discarded. Completed graphics remain on the timeline; remove them before generating again there.';
+  element('progress-label').textContent = ''; controls();
+});
 element('generate').addEventListener('click', async () => {
-  if (busy || !loaded) return;
-  let created = null;
-  let inserted = 0;
+  if (busy || pendingRun || !loaded) return;
   try {
     busy = true; controls();
     if (loaded.source === 'premiere' && !await sessions.refresh()) throw new Error(transcriptError || 'Could not refresh this timeline transcript.');
     const plan = preview();
     const settings = appearance();
     if (!window.proofConfig) throw new Error('The local subtitle template has not been configured.');
-    busy = true; generating = true; cancelled = false; controls();
-    const started = Date.now();
+    const created = await host('YTSubtitle.beginGeneration(' + argument({ ...window.proofConfig, ...loaded.context, appearance: settings }) + ')');
+    // shortcut: one resumable run in the open panel; persist native clip state before adding restart recovery.
+    pendingRun = { ...created, clips: plan.clips, inserted: 0, started: Date.now() };
     element('generation-progress').hidden = false;
     element('generation-progress').max = plan.clips.length;
     element('generation-progress').value = 0;
-    element('progress-label').textContent = 'Preparing one template for reuse…';
-    created = await host('YTSubtitle.beginGeneration(' + argument({ ...window.proofConfig, ...loaded.context, appearance: settings }) + ')');
-    for (let index = 0; index < plan.clips.length && !cancelled; index += 5) {
-      element('status').textContent = 'Creating editable graphics: ' + inserted + ' / ' + plan.clips.length + '. You can stop after this batch.';
-      const batch = await host('YTSubtitle.insertBatch(' + argument(created.sequenceId) + ',' + argument(plan.clips.slice(index, index + 5)) + ')');
-      inserted = batch.total;
-      element('generation-progress').value = inserted;
-      element('progress-label').textContent = inserted + ' / ' + plan.clips.length + ' graphics, ' + ((Date.now() - started) / 1000).toFixed(1) + ' seconds elapsed';
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
-    element('status').textContent = (cancelled ? 'Stopped. ' : 'Done. ') + inserted + ' editable graphics in “' + created.sequenceName + '”. The source sequence is unchanged.';
-  } catch (error) {
-    element('status').textContent = error.message + (created ? ' Partial graphics remain in “' + created.sequenceName + '”. The source sequence is unchanged.' : '');
-  } finally { busy = false; generating = false; controls(); }
+    await continueGeneration();
+  } catch (error) { element('status').textContent = error.message; }
+  finally { busy = false; generating = false; controls(); }
 });
 
 async function editSelected(expression, completed) {

@@ -60,7 +60,12 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
   vm.runInContext(fs.readFileSync(require.resolve('../prototype/cep/host.jsx'), 'utf8'), context);
   if (initialize) context.YTSubtitle.initialize(require('node:path').resolve(__dirname, '../prototype/cep'));
   original.timebase = timebase;
-  original.videoTracks = { numTracks: 2, 0: { clips: { numItems: 0 } }, 1: { clips: { numItems: 0 } } };
+  const editable = project.newSequence('fixture', 'unused');
+  original.importMGT = editable.importMGT;
+  original.videoTracks = editable.videoTracks;
+  original.getSelection = () => original.selection || [];
+  original.getPlayerPosition = () => ({ seconds: original.playhead || 0 });
+  project.activeSequence = original;
   project.path = 'test.prproj';
   project.sequences = { 0: original, numSequences: 1 };
   original.clone = () => {
@@ -154,11 +159,12 @@ test('aligns adjacent word intervals to whole frames at 29.97 fps', () => {
   assert.equal(result.clips[2].end, 3.003);
 });
 
-test('generates timed words on a duplicate using an empty track and preserves the source', () => {
+test('generates directly in the active sequence using an empty track without cloning', () => {
   const { api, project, created, original } = host();
   const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
   assert.equal(result.ok, true);
-  assert.notEqual(project.activeSequence, original);
+  assert.equal(project.activeSequence, original);
+  assert.equal(project.sequences.numSequences, 1);
   assert.equal(result.trackIndex, 1);
   const inserted = JSON.parse(api.insertBatch(result.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 15, endFrame: 21 }]));
   assert.equal(inserted.ok, true);
@@ -168,31 +174,76 @@ test('generates timed words on a duplicate using an empty track and preserves th
   assert.equal(created[0].trackIndex, 1);
 });
 
-test('blocks stale sequence data and occupied output tracks before cloning', () => {
+test('blocks stale data, occupied output tracks and existing phrase groups before writes', () => {
   const { api, project, original } = host();
   assert.equal(JSON.parse(api.beginGeneration({ ...options, sequenceId: 'wrong', projectPath: 'test.prproj' })).ok, false);
-  original.videoTracks[1].clips.numItems = 1;
+  const emptyClips = original.videoTracks[1].clips;
+  original.videoTracks[1].clips = { numItems: 1 };
   const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
   assert.equal(result.ok, false);
   assert.match(result.error, /empty video track/);
   assert.equal(project.sequences.numSequences, 1);
-  original.videoTracks[1].clips.numItems = 0;
+  original.videoTracks[1].clips = emptyClips;
   original.videoTracks[0].clips = { 0: { name: 'Subtitle 1: existing' }, numItems: 1 };
   const alreadyGenerated = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
   assert.equal(alreadyGenerated.ok, false);
-  assert.match(alreadyGenerated.error, /original source/);
+  assert.match(alreadyGenerated.error, /already contains generated subtitles/);
   assert.equal(project.sequences.numSequences, 1);
 });
 
-test('stops generation when the active sequence changes and rejects invalid intervals', () => {
+test('pauses on another sequence and resumes without repeating completed word graphics', () => {
   const { api, project, original, created } = host();
   const result = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  const words = [0, 1].map(i => ({ text: 'word' + i, phraseIndex: 0, startFrame: i * 30, endFrame: (i + 1) * 30 }));
+  const insert = original.importMGT;
+  original.importMGT = function() { const clip = insert.apply(this, arguments); project.activeSequence = { sequenceID: 'other' }; return clip; };
+  const partial = JSON.parse(api.insertBatch(result.sequenceId, words));
+  assert.equal(partial.ok, true); assert.equal(partial.paused, true); assert.equal(partial.total, 1);
+  assert.equal(created.length, 1);
   project.activeSequence = original;
-  assert.equal(JSON.parse(api.insertBatch(result.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 0, endFrame: 1 }])).ok, false);
-  assert.equal(created.length, 0);
+  const resumed = JSON.parse(api.insertBatch(result.sequenceId, words.slice(partial.total)));
+  assert.equal(resumed.ok, true); assert.equal(resumed.total, 2);
+  assert.equal(created.length, 2);
+});
+
+test('rejects invalid intervals without inserting clips', () => {
+  const { api, created } = host();
   const next = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
   assert.equal(JSON.parse(api.insertBatch(next.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 2, endFrame: 1 }])).ok, false);
   assert.equal(created.length, 0);
+});
+
+test('refuses further writes when the output track has been edited while paused', () => {
+  const { api, created } = host();
+  const r = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  api.insertBatch(r.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 0, endFrame: 30 }]);
+  created[0].end.seconds = 2;
+  const blocked = JSON.parse(api.insertBatch(r.sequenceId, [{ text: 'world', phraseIndex: 0, startFrame: 30, endFrame: 60 }]));
+  assert.equal(blocked.ok, true); assert.equal(blocked.paused, true); assert.match(blocked.note, /track.*changed/i);
+  assert.equal(created.length, 1);
+  created[0].end.seconds = 1;
+  assert.equal(JSON.parse(api.insertBatch(r.sequenceId, [{ text: 'world', phraseIndex: 0, startFrame: 30, endFrame: 60 }])).total, 2);
+});
+
+test('another project with the same sequence ID cannot receive resumed graphics', () => {
+  const { api, project, created } = host();
+  project.documentID = 'first-project';
+  const r = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  project.documentID = 'second-project';
+  const result = JSON.parse(api.insertBatch(r.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 0, endFrame: 30 }]));
+  assert.equal(result.paused, true);
+  assert.equal(result.total, 0);
+  assert.equal(created.length, 0);
+});
+
+test('added output-track clips block resume without overwriting their contents', () => {
+  const { api, created } = host();
+  const r = JSON.parse(api.beginGeneration({ ...options, sequenceId: 'original', projectPath: 'test.prproj' }));
+  const userClip = { name: 'Manual graphic', start: { seconds: 0 }, end: { seconds: 1 } };
+  created.push(userClip);
+  const result = JSON.parse(api.insertBatch(r.sequenceId, [{ text: 'Hello', phraseIndex: 0, startFrame: 0, endFrame: 30 }]));
+  assert.equal(result.paused, true);
+  assert.deepEqual(created, [userClip]);
 });
 
 test('updates all prefix graphics in the selected phrase without changing timing', () => {
@@ -295,7 +346,7 @@ test('preview appearance is applied consistently to each independently editable 
   }
 });
 
-test('appearance is rejected before cloning if values are invalid', () => {
+test('appearance is rejected before writes if values are invalid', () => {
   const { api, project } = host();
   assert.equal(JSON.parse(api.beginGeneration({ ...options, appearance: { font: 'Arial', size: 999 }, sequenceId: 'original', projectPath: 'test.prproj' })).ok, false);
   assert.equal(project.sequences.numSequences, 1);

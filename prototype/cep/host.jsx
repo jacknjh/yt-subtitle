@@ -116,20 +116,10 @@ var YTSubtitle = (function () {
             if (trackIndex < 0) throw new Error('Add an empty video track above your footage, then generate again.');
             for (var trackNumber = 0; trackNumber < source.videoTracks.numTracks; trackNumber++) {
                 var sourceClips = source.videoTracks[trackNumber].clips;
-                for (var clipNumber = 0; clipNumber < sourceClips.numItems; clipNumber++) if (/^Subtitle \d+: /.test(sourceClips[clipNumber].name)) throw new Error('This sequence already contains generated subtitles. Generate from the original source sequence to keep phrase groups separate.');
+                for (var clipNumber = 0; clipNumber < sourceClips.numItems; clipNumber++) if (/^Subtitle \d+: /.test(sourceClips[clipNumber].name)) throw new Error('This sequence already contains generated subtitles. Resume the unfinished run, or remove the previous generated graphics before starting again.');
             }
-            var existing = {};
-            var i;
-            for (i = 0; i < app.project.sequences.numSequences; i++) existing[app.project.sequences[i].sequenceID] = true;
-            if (!source.clone()) throw new Error('Premiere could not duplicate the sequence.');
-            var copies = [];
-            for (i = 0; i < app.project.sequences.numSequences; i++) if (!existing[app.project.sequences[i].sequenceID]) copies.push(app.project.sequences[i]);
-            if (copies.length !== 1) throw new Error('Could not identify the duplicated sequence. No subtitles inserted.');
-            var sequence = copies[0];
-            sequence.name = source.name + ' - subtitles ' + new Date().getTime();
-            app.project.openSequence(sequence.sequenceID);
-            if (context().sequenceId !== sequence.sequenceID) throw new Error('Could not activate the duplicated sequence.');
-            generation = { sequence: sequence, projectPath: current.projectPath, templatePath: new File(options.templatePath).fsName, trackIndex: trackIndex, count: 0, lastEnd: -1, projectItem: null, appearance: appearance };
+            var sequence = source;
+            generation = { sequence: sequence, projectId: current.projectId, projectPath: current.projectPath, templatePath: new File(options.templatePath).fsName, trackIndex: trackIndex, count: 0, lastEnd: -1, projectItem: null, appearance: appearance, written: [] };
             return JSON.stringify({ ok: true, sequenceId: sequence.sequenceID, sequenceName: sequence.name, trackIndex: trackIndex });
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) }); }
     }
@@ -141,12 +131,21 @@ var YTSubtitle = (function () {
             if (!clips || !clips.length || clips.length > 10) throw new Error('Invalid generation batch.');
             var ticksPerFrame = Number(generation.sequence.timebase);
             for (var i = 0; i < clips.length; i++) {
-                var current = context();
-                if (current.sequenceId !== sequenceId || current.projectPath !== generation.projectPath) throw new Error('Active sequence changed; generation stopped.');
+                var current;
+                try { current = context(); } catch (unavailable) { current = null; }
+                if (!current || current.sequenceId !== sequenceId || current.projectId !== generation.projectId || current.projectPath !== generation.projectPath) {
+                    report.paused = true; report.note = 'Return to “' + generation.sequence.name + '” and press Resume.'; break;
+                }
+                var track = generation.sequence.videoTracks[generation.trackIndex];
+                var unchanged = track && track.clips.numItems === generation.written.length;
+                if (unchanged && i === 0) for (var w = 0; w < generation.written.length; w++) {
+                    var recorded = generation.written[w], actual = track.clips[w];
+                    if (actual.nodeId !== recorded.id || Math.abs(actual.start.seconds - recorded.start) > 0.000001 || Math.abs(actual.end.seconds - recorded.end) > 0.000001) { unchanged = false; break; }
+                }
+                if (!unchanged) { report.paused = true; report.note = 'The subtitle track has changed. Restore its clips and timing before resuming, or discard this run.'; break; }
                 var state = clips[i];
                 if (typeof state.text !== 'string' || !state.text.length || typeof state.startFrame !== 'number' || typeof state.endFrame !== 'number' || !isFinite(state.startFrame) || !isFinite(state.endFrame) || state.startFrame % 1 || state.endFrame % 1 || state.startFrame < 0 || state.endFrame <= state.startFrame || state.startFrame < generation.lastEnd) throw new Error('Invalid or overlapping subtitle timing.');
                 var at = timeAtTicks(state.startFrame * ticksPerFrame);
-                var track = generation.sequence.videoTracks[generation.trackIndex];
                 var clip;
                 if (!generation.projectItem) {
                     clip = generation.sequence.importMGT(generation.templatePath, at.ticks, generation.trackIndex, 0);
@@ -163,6 +162,7 @@ var YTSubtitle = (function () {
                 clip.end = timeAtTicks(state.endFrame * ticksPerFrame);
                 configureGraphic(clip, state.text, generation.appearance);
                 clip.name = 'Subtitle ' + (state.phraseIndex + 1) + ': ' + state.text;
+                generation.written.push({ id: clip.nodeId, start: clip.start.seconds, end: clip.end.seconds });
                 generation.lastEnd = state.endFrame;
                 generation.count++;
                 report.inserted++;
@@ -408,7 +408,7 @@ var YTSubtitle = (function () {
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
-    return { apiVersion: 2, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
+    return { apiVersion: 3, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
         requestTranscript: function (context) { return bridge.requestTranscript(context); },
         pollTranscript: function (id) { return bridge.pollTranscript(id); },
         readSession: function (context) { return bridge.readSession(context); },

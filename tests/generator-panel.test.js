@@ -40,24 +40,60 @@ test('generates in small batches, reports completion and restores controls', asy
   assert.match(p.calls[0], /"appearance":\{"font":"Heebo-SemiBold"/);
 });
 
-test('stopping leaves completed batches and reports the partial result', async () => {
+test('pausing keeps the frozen plan and resumes from the next unfinished word', async () => {
+  let inserted = 0, begins = 0;
   const p = panel((expression, elements) => {
-    if (expression.includes('YTSubtitle.beginGeneration(')) return { ok: true, sequenceId: 'copy', sequenceName: 'Copy' };
-    elements.cancel.events.click();
-    return { ok: true, total: 5 };
+    if (expression.includes('YTSubtitle.beginGeneration(')) { begins++; return { ok: true, sequenceId: 'source', sequenceName: 'Edit' }; }
+    if (!inserted) { elements.cancel.events.click(); inserted = 5; }
+    else { assert.match(expression, /"startFrame":150/); inserted = 7; }
+    return { ok: true, total: inserted };
   });
   p.accept();
   await p.elements.generate.events.click();
   assert.equal(p.calls.length, 2);
-  assert.match(p.elements.status.textContent, /Stopped. 5 editable graphics/);
+  assert.match(p.elements.status.textContent, /Paused.*5/);
+  assert.equal(p.elements.resume.disabled, false);
+  p.elements.characters.value = '1';
+  await p.elements.resume.events.click();
+  assert.equal(begins, 1);
+  assert.equal(inserted, 7);
+  assert.match(p.elements.status.textContent, /Done/);
+  assert.equal(p.elements.resume.hidden, true);
 });
 
-test('a host error reports the duplicate containing partial graphics', async () => {
+test('a host error reports the timeline containing partial graphics', async () => {
   const p = panel(expression => expression.includes('YTSubtitle.beginGeneration(') ? { ok: true, sequenceId: 'copy', sequenceName: 'Copy' } : { ok: false, error: 'Sequence changed' });
   p.accept();
   await p.elements.generate.events.click();
   assert.match(p.elements.status.textContent, /Sequence changed.*Partial graphics remain/);
   assert.equal(p.elements.load.disabled, false);
+});
+
+test('a mid-batch sequence switch resumes using the native completed count', async () => {
+  let batches = 0;
+  const p = panel(expression => {
+    if (expression.includes('YTSubtitle.beginGeneration(')) return { ok: true, sequenceId: 'source', sequenceName: 'Edit' };
+    batches++;
+    if (batches === 1) return { ok: true, paused: true, note: 'Return to Edit.', total: 2 };
+    assert.match(expression, /"startFrame":60/);
+    return { ok: true, total: 7 };
+  });
+  p.accept();
+  await p.elements.generate.events.click();
+  assert.equal(p.elements['generation-progress'].value, 2);
+  await p.elements.resume.events.click();
+  assert.equal(batches, 2);
+  assert.equal(p.elements['generation-progress'].value, 7);
+});
+
+test('discard forgets the pending run without deleting completed timeline graphics', async () => {
+  const p = panel(expression => expression.includes('YTSubtitle.beginGeneration(') ? { ok: true, sequenceId: 'source', sequenceName: 'Edit' } : { ok: true, paused: true, total: 2 });
+  p.accept(); await p.elements.generate.events.click();
+  const calls = p.calls.length;
+  p.elements['discard-run'].events.click();
+  assert.equal(p.calls.length, calls);
+  assert.equal(p.elements.resume.hidden, true);
+  assert.equal(p.elements.generate.disabled, false);
 });
 
 test('parent buttons call the playhead and latest-style APIs and enable sync only after success', async () => {

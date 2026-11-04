@@ -4,11 +4,11 @@ An extension in development for editable animated subtitles in Premiere. The app
 
 ## Current status
 
-The CEP panel now generates editable, word-timed MOGRT graphics from Premiere transcript JSON. It groups whole words by character limit (or shows one word at a time), duplicates the source sequence, and inserts growing phrase prefixes on an empty top video track. Generation runs in stoppable batches. An installed background UXP reader transfers the active sequence transcript directly to the generator.
+The CEP panel now generates editable, word-timed MOGRT graphics from Premiere transcript JSON. It groups whole words by character limit (or shows one word at a time), inserts growing phrase prefixes on an empty top video track in the active sequence, and keeps progress when paused or when switching timelines. Resume continues the frozen run without repeating completed words. An installed background UXP reader transfers the active sequence transcript directly to the generator.
 
 [Load and run the prototype](prototype/README.md). [Compatibility findings and pending checks](docs/premiere-compatibility.md).
 
-The [Subtitle Generator CEP panel](prototype/cep/README.md) offers an approximate animated preview and appearance controls before generation. It also syncs selected graphics to the latest style of a parent chosen under the playhead, and updates phrase text while retaining timeline boundaries. It imports the installed Karaoke MOGRT once per run and reuses independent editable instances, with a progress bar and Stop control. That template is not distributed. Its installer records the prior CEP developer setting.
+The [Subtitle Generator CEP panel](prototype/cep/README.md) offers an approximate animated preview and appearance controls before generation. It also syncs selected graphics to the latest style of a parent chosen under the playhead, and updates phrase text while retaining timeline boundaries. It imports the installed Karaoke MOGRT once per run and reuses independent editable instances, with a progress bar and Pause/Resume controls. That template is not distributed. Its installer records the prior CEP developer setting.
 
 Generate, Style, Edit and Help tabs separate the workflow, while generation actions and status stay visible. The Style tab includes searchable local font faces and color swatches with editable hex values.
 

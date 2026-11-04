@@ -47,7 +47,7 @@ pre { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inher
 details { margin-top: 16px; } summary { cursor: pointer; }
 textarea { width: 100%; min-height: 88px; resize: vertical; }
 footer { flex: none; padding: 12px 16px; border-top: 1px solid #555; background: #252525; }
-.generate-row { display: flex; gap: 8px; }
+.generate-row { display: flex; flex-wrap: wrap; gap: 8px; }
 #generate { flex: 1; background: var(--accent); color: #12202e; border-color: var(--accent); font-weight: 600; }
 #generate:hover:not(:disabled) { background: #b9dfff; }
 #cancel { min-width: 64px; }
@@ -121,15 +121,16 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <dt>Choose transcript JSON file</dt><dd>The Generate tab's JSON fallback opens a previously exported transcript. Use it when a native transcript is unavailable or you want to supply your own data.</dd>
 <dt>Style and preview</dt><dd>Choose a phrase, play or scrub its timing, then adjust appearance. The preview is approximate and does not modify timeline graphics.</dd>
 <dt>Fonts and colors</dt><dd>Search local font faces, then choose one from the dropdown. Click a color swatch to open its picker, or type a six-digit hex color. New fonts appear after rerunning the panel installer.</dd>
-<dt>Generate subtitles</dt><dd>Creates a duplicate sequence with editable word graphics on an empty top video track. Your source sequence is preserved.</dd>
-<dt>Stop</dt><dd>Finishes the current batch and keeps completed graphics. The progress bar shows completed graphics and elapsed time.</dd>
+<dt>Generate subtitles</dt><dd>Adds editable word graphics directly to an empty top video track in the current sequence. No duplicate sequence is created.</dd>
+<dt>Pause / Resume</dt><dd>Pause finishes the current batch and retains progress. Switching timelines also pauses generation. Return to the original timeline and press Resume. The original appearance and word plan are kept. Resume requires unchanged subtitle clip positions; edit other tracks freely. One unfinished run is kept while this panel remains open.</dd>
+<dt>Discard run</dt><dd>Forgets the unfinished run without deleting its completed graphics. Remove those graphics before generating a new run on that timeline.</dd>
 <dt>Set parent / Sync selected</dt><dd>Remembers the generated graphic under the playhead, then copies its latest appearance to the selected destinations. Press Sync again after changing the parent.</dd>
 <dt>Read / Update phrase</dt><dd>Loads the phrase associated with a selected generated graphic. Update rewrites all its word graphics while retaining their timeline positions. Duplicate or delete word graphics first when changing the word count.</dd>
 </dl>
 </section>
 </main>
 <footer>
-<div class="generate-row"><button id="generate" disabled>Generate subtitles</button><button id="cancel" disabled>Stop</button></div>
+<div class="generate-row"><button id="generate" disabled>Generate subtitles</button><button id="cancel" disabled>Pause</button><button id="resume" hidden disabled>Resume</button><button id="discard-run" hidden disabled>Discard run</button></div>
 <progress id="generation-progress" max="1" value="0" hidden aria-label="Subtitle generation progress"></progress>
 <p id="progress-label" class="muted"></p>
 <p id="status" role="status" aria-live="polite">Connecting to the active timeline. Choose appearance in the Style tab.</p>

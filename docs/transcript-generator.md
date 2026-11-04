@@ -9,14 +9,14 @@ Tested in Premiere 26.2.2 on Windows. The tested landscape subtitle MOGRT is a s
 3. Open **Window > Extensions > Subtitle Generator**. The active sequence transcript loads automatically. **Refresh from Premiere** rereads corrections; generation also refreshes an automatic source before creating graphics. **Use a JSON file instead** provides the manual fallback.
 4. Set characters per phrase or single-word mode. An individual long word stays whole. Sentence endings and pauses longer than one second also start a phrase.
 5. Adjust the approximate preview's font, size, text/highlight colors, position and word reveal mode. Play or scrub a phrase to inspect timing. These controls apply to newly generated graphics; existing graphics use the parent sync workflow below.
-6. Ensure the source sequence has an empty top video track. Generate duplicates the complete video/audio sequence and inserts editable MOGRT word states on that track. The source is never cleared or saved automatically.
-7. Use **Stop** to finish the current batch and retain partial output. Switching sequence/project stops the next write. A stopped run cannot resume through the panel; start again from the original source.
+6. Ensure the current sequence has an empty top video track. Generate inserts editable MOGRT word states directly on that track. It does not clone, clear or save the sequence. Existing generated subtitles must be removed before another fresh run in the same sequence.
+7. Use **Pause** to finish the current batch and retain progress. Switching sequence/project also pauses the next write. Return to the original timeline and choose **Resume** to continue from the next unfinished word. The run retains its original grouping and appearance even if you change preview settings. Completed subtitle clip positions must remain unchanged until generation finishes. **Discard run** forgets continuation without deleting completed graphics. One unfinished run is retained while the panel remains open; restart recovery is not supported.
 
 The reader uses local files inside its own plugin-data folder, with no network service or broad filesystem permission. Requests and responses include project/sequence identity and a unique request/session ID. Sequence changes discard pending replies. Settings and snapshots are stored privately per project GUID, project path and sequence GUID under `%APPDATA%/Adobe/YTSubtitleGenerator/sessions`. A cached automatic transcript is labeled and cannot be used for generation until refreshed. Manual JSON stays a manual override after reopening until Refresh is chosen. Parent selection remains temporary.
 
 ## Editing
 
-The graphic text grows with each word, while the latest word is highlighted. Each state has its own timeline clip. Trim, move, duplicate or remove clips using Premiere's timeline tools. Growing prefixes use a left anchor in the lower part of the frame. The template's line limit is raised to 200 so it does not independently wrap short phrases; very long phrases can run outside the frame. Stable full-phrase wrapping is not implemented. Existing source captions and test graphics are retained on the duplicate and may overlap the generated subtitles.
+The graphic text grows with each word, while the latest word is highlighted. Each state has its own timeline clip. Trim, move, duplicate or remove clips using Premiere's timeline tools. Growing prefixes use a left anchor in the lower part of the frame. The template's line limit is raised to 200 so it does not independently wrap short phrases; very long phrases can run outside the frame. Stable full-phrase wrapping is not implemented. Existing source captions and test graphics are retained in the sequence and may overlap the generated subtitles.
 
 To copy a style, edit a generated graphic using Premiere's Properties panel, place the playhead over it, and choose **Set parent from playhead**. If multiple generated graphics overlap there, select the intended one first. Select destinations and choose **Sync selected to parent**. Each sync rereads the parent's latest style. It preserves destination text and timeline boundaries, and leaves unselected graphics unchanged. The parent is remembered only for this panel session and project/sequence; there is no continuous automatic link. Supported template controls cover fonts, size, colors, spacing, offset, alignment, box settings and template animation toggles. Animated/keyframed style controls and mixed font runs are rejected before writes. An unexpected host write failure can leave earlier destinations updated; the error reports progress.
 
@@ -24,7 +24,7 @@ To fix a phrase, select one generated graphic and choose **Read selected phrase*
 
 ## Verification and remaining work
 
-68 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
+74 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
 
 Live style capture/application and phrase updates succeeded. The reloaded panel's Read selected phrase button populated `Hello, guys.` and enabled phrase editing. Final video frame exports showed `Hello,` followed by `Hello, guys.` in the lower part of the frame with the newest word highlighted. Existing source captions and the earlier native test title remain visible separately.
 
@@ -44,7 +44,7 @@ The canvas preview uses the same planned word intervals and settings, but browse
 
 ## Buttons and controls
 
-**Generate** contains transcript loading and phrase grouping. **Style** contains the preview and appearance controls. **Edit** contains parent synchronization and phrase corrections. **Help** explains the workflow. Generate/Stop, progress and status remain visible on every tab. Tab changes preserve settings and each tab's scroll position; moving away from Style pauses its preview.
+**Generate** contains transcript loading and phrase grouping. **Style** contains the preview and appearance controls. **Edit** contains parent synchronization and phrase corrections. **Help** explains the workflow. Generate/Pause, progress and status remain visible on every tab. Tab changes preserve settings and each tab's scroll position; moving away from Style pauses its preview.
 
 | Control | Effect |
 | --- | --- |
@@ -56,8 +56,10 @@ The canvas preview uses the same planned word intervals and settings, but browse
 | Play preview / Pause preview | Animate or pause the approximate word reveal. |
 | Preview timing slider | Scrub the chosen phrase without creating timeline clips. |
 | Appearance controls | Choose font, size, colors, position and reveal with/without highlight for new generation. |
-| Generate subtitles | Duplicate the source sequence and create editable graphics using the chosen appearance. |
-| Stop | Finish the current batch and retain partial output. |
+| Generate subtitles | Create editable graphics directly in the active sequence using the chosen appearance. |
+| Pause | Finish the current batch and retain progress. |
+| Resume | Continue the unfinished run after returning to its timeline; preserve the original plan and style. |
+| Discard run | Forget continuation without deleting completed graphics. |
 | Set parent from playhead | Remember the generated graphic under the playhead as the style parent. |
 | Sync selected to parent | Copy the parent's latest style to currently selected graphics; preserve words and timing. |
 | Read selected phrase | Load the full phrase associated with one selected generated graphic. |
@@ -88,4 +90,10 @@ Not verified: a full ten-minute run using the new reuse path, undo grouping, reo
 
 The installed reader transfers the live active-sequence transcript into CEP. A live read returned 1,205 timed words without a JSON chooser and without regenerating or changing timeline graphics. Panel reload restored saved appearance/grouping settings. Automated checks cover request identity, expired requests, sequence changes during reads, stale snapshot gating, manual overrides and per-sequence restoration. The bridge normalizes Windows extended paths because Premiereâ€™s UXP and CEP APIs format the same project path differently.
 
-A normal Premiere restart is the remaining installation check: the live development-session result does not by itself verify installed startup behavior.
+After the user restarted Premiere, the installed External reader heartbeat and current transcript were present without reloading the reader through Developer Tools. Installed startup behavior is verified on this Premiere build.
+
+## In-place generation and resume, November 4
+
+Generation no longer clones the sequence. Native state and the panel keep the completed word count on safe pauses, including partial batches interrupted by a sequence switch. Resume does not re-export the transcript or regroup words midway through a run. Before further insertion, the dedicated track is checked against recorded clip identities and boundaries. Changes to that track pause the run; unknown write failures invalidate continuation instead of guessing whether a partial graphic exists.
+
+A live isolated 29.97 fps check generated one word directly in the test sequence, switched to the user’s timeline, confirmed a pause at one completed word, returned and resumed to three words. Text and all boundaries matched readback (0–0.5005, 0.5005–1.001, 1.001–1.5015 seconds). Generation created no duplicate sequence. The temporary test sequence was deleted and the user’s original active timeline restored. The full ten-minute transcript was not regenerated.
