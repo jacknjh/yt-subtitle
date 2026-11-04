@@ -2,7 +2,8 @@ var YTSubtitle = (function () {
     function initialize(extensionPath) {
         // The first manifest-loaded JSX cannot reliably use $.fileName to locate its dependencies.
         if (typeof JSON === 'undefined') $.evalFile(new File(extensionPath + '/vendor/json2.js'));
-        if (typeof SubtitleAppearance === 'undefined' || typeof SubtitleAppearance.anchorX !== 'function') $.evalFile(new File(extensionPath + '/appearance.js'));
+        if (typeof SubtitleAppearance === 'undefined' || SubtitleAppearance.defaults().lines === undefined) $.evalFile(new File(extensionPath + '/appearance.js'));
+        if (typeof SubtitleLayout === 'undefined') $.evalFile(new File(extensionPath + '/layout.js'));
         if (typeof SubtitleIdentity === 'undefined') $.evalFile(new File(extensionPath + '/identity.js'));
         if (typeof createSubtitleBridge === 'undefined') $.evalFile(new File(extensionPath + '/bridge.jsx'));
         if (!bridge) bridge = createSubtitleBridge(context);
@@ -31,7 +32,7 @@ var YTSubtitle = (function () {
         parameter.setValue(value, updateUI === true);
     }
 
-    function configureGraphic(clip, text, appearance) {
+    function configureGraphic(clip, text, appearance, layout) {
         var component = clip.getMGTComponent();
         if (!component) throw new Error('The inserted template exposes no MOGRT component.');
         var properties = component.properties;
@@ -70,6 +71,14 @@ var YTSubtitle = (function () {
                 var hex = colors[n];
                 color.setColorValue(color.getColorValue()[0], parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16), false);
             }
+        }
+        if (layout) {
+            SubtitleLayout.validate(layout);
+            setControl(properties, 'Anchor X', layout.anchorX);
+            setControl(properties, 'Anchor Y', layout.anchorY);
+            setControl(properties, 'Paragraph Alignment', layout.paragraph);
+            setControl(properties, 'Line Spacing', 0);
+            setControl(properties, 'Offset', layout.offset);
         }
         changeText(parameter, text);
     }
@@ -145,6 +154,8 @@ var YTSubtitle = (function () {
                 }
                 if (!unchanged) { report.paused = true; report.note = 'The subtitle track has changed. Restore its clips and timing before resuming, or discard this run.'; break; }
                 var state = clips[i];
+                if (generation.appearance && (generation.appearance.centeredReveal || generation.appearance.lines === 2) && !state.layout) throw new Error('This subtitle requires a measured layout. Refresh the preview before generating.');
+                if (state.layout) SubtitleLayout.validate(state.layout);
                 if (typeof state.text !== 'string' || !state.text.length || typeof state.startFrame !== 'number' || typeof state.endFrame !== 'number' || !isFinite(state.startFrame) || !isFinite(state.endFrame) || state.startFrame % 1 || state.endFrame % 1 || state.startFrame < 0 || state.endFrame <= state.startFrame || state.startFrame < generation.lastEnd) throw new Error('Invalid or overlapping subtitle timing.');
                 var at = timeAtTicks(state.startFrame * ticksPerFrame);
                 var clip;
@@ -161,8 +172,8 @@ var YTSubtitle = (function () {
                 if (!clip) throw new Error('Premiere could not insert the next subtitle.');
                 if (Math.abs(clip.start.seconds - at.seconds) > ticksPerFrame / 254016000000 / 4) throw new Error('Premiere placed the reused subtitle at an unexpected time.');
                 clip.end = timeAtTicks(state.endFrame * ticksPerFrame);
-                configureGraphic(clip, state.text, generation.appearance);
-                clip.name = 'Subtitle ' + (state.phraseIndex + 1) + ': ' + state.text;
+                configureGraphic(clip, state.text, generation.appearance, state.layout);
+                clip.name = 'Subtitle ' + (state.phraseIndex + 1) + ': ' + state.text.replace(/\r\n|\r|\n/g, ' ');
                 generation.written.push({ id: clip.nodeId, start: clip.start.seconds, end: clip.end.seconds });
                 generation.lastEnd = state.endFrame;
                 generation.count++;
@@ -393,23 +404,28 @@ var YTSubtitle = (function () {
             if (!options || current.sequenceId !== options.context.sequenceId || current.projectPath !== options.context.projectPath) throw new Error('Sequence changed. Read the selected phrase again.');
             var phrase = selectedPhrase();
             if (phrase.prefix !== options.prefix) throw new Error('Selection changed. Read the selected phrase again.');
-            var words = String(options.text || '').replace(/^\s+|\s+$/g, '').split(/\s+/);
+            var raw = String(options.text || '').replace(/^\s+|\s+$/g, ''), rows = raw.split(/\r\n|\r|\n/);
+            if (rows.length > 2) throw new Error('A phrase can contain at most two lines.');
+            var words = raw.split(/\s+/);
             if (!words[0] || words.length !== phrase.clips.length) throw new Error('This phrase has ' + phrase.clips.length + ' timed graphics. Enter that many words, or duplicate/delete word graphics on the timeline first.');
             for (var i = 0; i < phrase.clips.length; i++) {
                 var text = JSON.parse(graphicProperties(phrase.clips[i]).getParamForDisplayName('Text').getValue());
                 if (typeof text.textEditValue !== 'string' || !text.fontTextRunLength || text.fontTextRunLength.length !== 1) throw new Error('Unsupported phrase text formatting.');
             }
+            var previous = JSON.parse(graphicProperties(phrase.clips[phrase.clips.length - 1]).getParamForDisplayName('Text').getValue()).textEditValue.split(/\r\n|\r|\n/);
+            var breakAt = rows.length === 2 ? rows[0].replace(/^\s+|\s+$/g, '').split(/\s+/).length : previous.length === 2 ? previous[0].replace(/^\s+|\s+$/g, '').split(/\s+/).length : words.length;
             for (var j = 0; j < phrase.clips.length; j++) {
-                var prefixText = words.slice(0, j + 1).join(' ');
+                var prefixText = words.slice(0, Math.min(j + 1, breakAt)).join(' ');
+                if (j + 1 > breakAt) prefixText += '\r' + words.slice(breakAt, j + 1).join(' ');
                 changeText(graphicProperties(phrase.clips[j]).getParamForDisplayName('Text'), prefixText);
-                phrase.clips[j].name = phrase.prefix + prefixText;
+                phrase.clips[j].name = phrase.prefix + prefixText.replace(/\r/g, ' ');
                 updated++;
             }
             return JSON.stringify({ ok: true, note: 'Updated ' + updated + ' word graphics. Their timing and individual styles are preserved.' });
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
-    return { apiVersion: 4, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
+    return { apiVersion: 5, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
         requestTranscript: function (context) { return bridge.requestTranscript(context); },
         pollTranscript: function (id) { return bridge.pollTranscript(id); },
         readSession: function (context) { return bridge.readSession(context); },

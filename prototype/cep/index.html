@@ -52,7 +52,7 @@ label, .field-title { display: block; margin: 0 0 5px; }
 .timeline-name { margin: 0 0 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 #transcript-source { margin: 4px 0; } #summary { margin: 8px 0; font-weight: 600; }
 .grouping-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 16px; }
-.grouping-row .field { flex: 0 1 136px; margin: 0; }
+.grouping-row .field { flex: 1 1 104px; max-width: 160px; margin: 0; }
 .grouping-row .check { margin: 0; min-height: 34px; }
 .scrub-value { cursor: ew-resize; touch-action: none; user-select: none; font-variant-numeric: tabular-nums; }
 .scrub-value:hover:not(:disabled) { border-color: var(--accent); }
@@ -105,6 +105,7 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <div class="control-section">
 <h2>Phrase grouping</h2>
 <div class="grouping-row"><div class="field"><label for="characters">Characters per phrase</label><input id="characters" type="number" min="1" max="200" value="24"></div>
+<div class="field"><label for="max-lines">Lines per phrase</label><select id="max-lines"><option value="1">1 line</option><option value="2">Up to 2 lines</option></select></div>
 <label class="check"><input id="single-word" type="checkbox"> One word at a time</label></div>
 <p class="hint">Whole words. Sentences and pauses may split earlier.</p>
 <details><summary>First phrases</summary><pre id="preview" aria-label="First five phrases"></pre></details>
@@ -131,6 +132,8 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 </div></div>
 <div class="control-section"><h2>Position</h2>
 <div class="field"><label for="alignment">Phrase alignment</label><select id="alignment"><option value="left">Left</option><option value="center" selected>Center</option><option value="right">Right</option></select></div>
+<label class="check" style="margin:0 0 4px"><input id="default-layout" type="checkbox"> Default</label>
+<p class="hint" style="margin-bottom:12px">Center the completed phrase. Left builds from its left edge; Right grows leftward in spoken order; Center keeps recentering.</p>
 <div class="fields">
 <div class="field"><label for="position-x">Horizontal (%)</label><input id="position-x" class="scrub-value" type="number" min="0" max="100" step="0.1" value="50" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
 <div class="field"><label for="position-y">Vertical (%)</label><input id="position-y" class="scrub-value" type="number" min="0" max="100" step="0.1" value="90" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
@@ -165,6 +168,8 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <dt>Pinned preview</dt><dd>The preview stays above the scrolling controls in a narrow panel, or beside them in a wider panel. Premiere remains the final reference for spacing and rendering.</dd>
 <dt>Style and preview</dt><dd>Choose a phrase, play or scrub its timing, then adjust appearance. The preview is approximate and does not modify timeline graphics.</dd>
 <dt>Default style and alignment</dt><dd>New timelines start with Times New Roman, plain word reveal and a bottom-center anchor at 50% horizontal, 90% vertical. Left, Center and Right align the visible phrase around that horizontal position. Saved styles are retained; Reset style applies the new defaults and can be undone.</dd>
+<dt>Default toggle</dt><dd>With Default enabled, the completed phrase block is centered on the horizontal position. Left reveals from its fixed left edge, Center retains centered growing phrases, and Right grows leftward from the completed phrase's right edge in normal spoken order. The toggle starts off to retain existing behavior.</dd>
+<dt>Two lines</dt><dd>Choose Up to 2 lines in Generate. A balanced word-boundary break is chosen from the complete phrase before reveal; single words stay on one line. The character limit still applies to the whole phrase. The bottom line stays near the configured vertical position, with the other line above it.</dd>
 <dt>Fonts and colors</dt><dd>Search local font faces, then choose one from the dropdown. Click a color swatch to open its picker, or type a six-digit hex color. New fonts appear after rerunning the panel installer.</dd>
 <dt>Drag numeric values</dt><dd>Drag font size or a position value left to decrease, right to increase. Hold Shift for fine adjustments. Escape cancels the drag. Click to type; press Enter or click elsewhere when finished. Arrow keys also adjust a focused field.</dd>
 </dl></div>
@@ -186,5 +191,5 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <p id="progress-label" class="muted"></p>
 <p id="status" role="status" aria-live="polite">Connecting to the active timeline. Choose appearance in the Style tab.</p>
 </footer>
-<script src="config.js"></script><script src="planner.js"></script><script src="appearance.js"></script><script src="scrub.js"></script><script src="history.js"></script><script src="identity.js"></script><script src="sessions.js"></script><script src="font-data.js"></script><script src="main.js"></script>
+<script src="config.js"></script><script src="planner.js"></script><script src="appearance.js"></script><script src="layout.js"></script><script src="scrub.js"></script><script src="history.js"></script><script src="identity.js"></script><script src="sessions.js"></script><script src="font-data.js"></script><script src="main.js"></script>
 </body></html>

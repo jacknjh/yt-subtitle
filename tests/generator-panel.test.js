@@ -7,13 +7,14 @@ const SubtitleAppearance = require('../prototype/cep/appearance');
 
 function panel(respond) {
   const elements = {};
-  const initial = { characters: '24', font: 'TimesNewRomanPSMT', 'font-size': '85', 'text-color': '#ebebeb', 'highlight-color': '#fffe00', 'text-color-hex': '#ebebeb', 'highlight-color-hex': '#fffe00', 'position-x': '50', 'position-y': '90', animation: 'reveal', alignment: 'center' };
+  const initial = { characters: '24', font: 'TimesNewRomanPSMT', 'font-size': '85', 'text-color': '#ebebeb', 'highlight-color': '#fffe00', 'text-color-hex': '#ebebeb', 'highlight-color-hex': '#fffe00', 'position-x': '50', 'position-y': '90', animation: 'reveal', alignment: 'center', 'max-lines': '1' };
   const listeners = {};
   const document = { addEventListener(name, handler) { (listeners[name] ||= []).push(handler); }, createElement() { return {}; }, getElementById(id) {
     return elements[id] ||= { ownerDocument: document, value: initial[id] || '', checked: false, textContent: '', disabled: false, events: {}, setAttribute(key, value) { this[key] = value; }, focus() { this.focused = true; }, appendChild() {}, addEventListener(event, callback) { this.events[event] = callback; } };
   } };
   const calls = [];
-  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, SubtitleIdentity: require('../prototype/identity'), createSettingsHistory: require('../prototype/cep/history'), attachSubtitleScrub: require('../prototype/cep/scrub'), createTranscriptSessions: require('../prototype/cep/sessions'), setTimeout, clearTimeout, window: {
+  elements['subtitle-preview'] = { ...document.getElementById('subtitle-preview'), width: 960, height: 540, getContext: () => ({ setTransform() {}, fillRect() {}, fillText() {}, measureText: text => ({ width: text.length * 10, actualBoundingBoxLeft: 0, actualBoundingBoxRight: text.length * 10 }) }) };
+  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, SubtitleLayout: require('../prototype/cep/layout'), SubtitleIdentity: require('../prototype/identity'), createSettingsHistory: require('../prototype/cep/history'), attachSubtitleScrub: require('../prototype/cep/scrub'), createTranscriptSessions: require('../prototype/cep/sessions'), setTimeout, clearTimeout, window: {
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     SubtitleFonts: [{ postscript: 'Example-Bold', label: 'Example Bold', family: 'Example', style: 'Bold' }],
     proofConfig: { templatePath: 'template.mogrt' },
@@ -288,6 +289,7 @@ test('manual chooser remains usable when the automatic reader is unavailable', a
 test('Reset style is undoable and preserves phrase grouping', () => {
   const p = panel(() => ({ ok: true }));
   p.elements.characters.value = '32'; p.elements.characters.events.change();
+  p.elements['max-lines'].value = '2'; p.elements['max-lines'].events.change();
   p.elements.font.value = 'ArialMT'; p.elements.font.events.change();
   p.elements.alignment.value = 'right'; p.elements.alignment.events.change();
   p.elements['reset-style'].events.click();
@@ -295,7 +297,24 @@ test('Reset style is undoable and preserves phrase grouping', () => {
   assert.equal(p.elements.alignment.value, 'center');
   assert.equal(p.elements.animation.value, 'reveal');
   assert.equal(p.elements.characters.value, 32);
+  assert.equal(Number(p.elements['max-lines'].value), 2);
   p.elements['undo-settings'].events.click();
   assert.equal(p.elements.font.value, 'ArialMT');
   assert.equal(p.elements.alignment.value, 'right');
+});
+
+test('Default and line count update preview geometry, support undo and travel with generation', async () => {
+  const p = panel(expression => expression.includes('YTSubtitle.beginGeneration(') ? { ok: true, sequenceId: 'source', sequenceName: 'Edit' } : { ok: true, total: expression.includes('"startFrame":0') ? 5 : 7 });
+  p.accept();
+  p.elements['default-layout'].checked = true; p.elements['default-layout'].events.change();
+  p.elements['max-lines'].value = '2'; p.elements['max-lines'].events.change();
+  assert.match(p.elements.preview.textContent, /\r/);
+  p.elements['undo-settings'].events.click();
+  assert.equal(Number(p.elements['max-lines'].value), 1);
+  p.elements['redo-settings'].events.click();
+  assert.equal(Number(p.elements['max-lines'].value), 2);
+  await p.elements.generate.events.click();
+  assert.match(p.calls[0], /"centeredReveal":true,"lines":2/);
+  assert.match(p.calls[1], /"layout":/);
+  assert.match(p.elements.status.textContent, /Done/);
 });

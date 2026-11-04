@@ -1,5 +1,5 @@
 (function (root) {
-  function defaults() { return { font: 'TimesNewRomanPSMT', size: 85, textColor: '#ebebeb', highlightColor: '#fffe00', x: 50, y: 90, mode: 'reveal', alignment: 'center' }; }
+  function defaults() { return { font: 'TimesNewRomanPSMT', size: 85, textColor: '#ebebeb', highlightColor: '#fffe00', x: 50, y: 90, mode: 'reveal', alignment: 'center', centeredReveal: false, lines: 1 }; }
   function anchorX(alignment) { return { left: 0, center: 50, right: 100 }[alignment]; }
   function validate(value) {
     var a = value == null ? defaults() : value;
@@ -10,7 +10,10 @@
     if (a.mode !== 'reveal-highlight' && a.mode !== 'reveal') throw new Error('Choose a supported word reveal style.');
     var alignment = a.alignment === undefined ? 'left' : a.alignment;
     if (alignment !== 'left' && alignment !== 'center' && alignment !== 'right') throw new Error('Choose left, center or right alignment.');
-    return { font: a.font, size: a.size, textColor: a.textColor, highlightColor: a.highlightColor, x: a.x, y: a.y, mode: a.mode, alignment: alignment };
+    var centeredReveal = a.centeredReveal === undefined ? false : a.centeredReveal;
+    var lines = a.lines === undefined ? 1 : a.lines;
+    if (typeof centeredReveal !== 'boolean' || (lines !== 1 && lines !== 2)) throw new Error('Choose valid Default and line-count settings.');
+    return { font: a.font, size: a.size, textColor: a.textColor, highlightColor: a.highlightColor, x: a.x, y: a.y, mode: a.mode, alignment: alignment, centeredReveal: centeredReveal, lines: lines };
   }
   function captionAt(clips, frame) {
     var low = 0, high = clips.length - 1, candidate = null;

@@ -364,3 +364,36 @@ test('phrase alignment writes the supported template anchor and bottom-center de
     assert.deepEqual(Array.from(created[0].controls['Active Word Color'].getColorValue()), [1,235,235,235]);
   }
 });
+
+test('measured two-line layouts apply their reserved anchors and remain editable as phrases', () => {
+  const appearance = require('../prototype/cep/appearance'), layout = require('../prototype/cep/layout');
+  const { api, project, created } = host();
+  const style = { ...appearance.defaults(), centeredReveal: true, alignment: 'left', lines: 2 };
+  const r = JSON.parse(api.beginGeneration({ ...options, appearance: style, sequenceId: 'original', projectPath: 'test.prproj' }));
+  const words = 'one two three four'.split(' ');
+  const states = words.map((word, i) => {
+    const placed = layout.state(words.join(' '), i + 1, style, text => text.length * 10);
+    return { text: placed.text, layout: placed, phraseIndex: 0, startFrame: i * 30, endFrame: (i+1)*30 };
+  });
+  assert.equal(JSON.parse(api.insertBatch(r.sequenceId, states)).total, 4);
+  assert(created.every(c => c.controls['Anchor Y'].getValue() === 0));
+  assert(created.every(c => c.controls['Paragraph Alignment'].getValue() === 1));
+  assert(created.every(c => !/[\r\n]/.test(c.name)));
+  project.activeSequence.selection = [created[0]];
+  const phrase = JSON.parse(api.readPhrase());
+  assert.equal(phrase.text, 'one two\rthree four');
+  assert.equal(JSON.parse(api.updatePhrase({ ...phrase, text: 'new words\nare here' })).ok, true);
+  assert.equal(JSON.parse(created[3].controls.Text.getValue()).textEditValue, 'new words\rare here');
+  assert.equal(JSON.parse(api.updatePhrase({ ...phrase, text: 'new\nwords\nare here' })).ok, false);
+  assert.deepEqual(created.map(c => [c.start.seconds,c.end.seconds]), [[0,1],[1,2],[2,3],[3,4]]);
+});
+
+test('invalid or missing measured layouts are rejected before inserting a graphic', () => {
+  const appearance = require('../prototype/cep/appearance');
+  for (const layout of [undefined, { anchorX: 0, anchorY: 0, paragraph: 1, offset: [NaN, 0] }]) {
+    const { api, created } = host();
+    const r = JSON.parse(api.beginGeneration({ ...options, appearance: { ...appearance.defaults(), lines: 2 }, sequenceId: 'original', projectPath: 'test.prproj' }));
+    assert.equal(JSON.parse(api.insertBatch(r.sequenceId, [{ text: 'one', layout, phraseIndex: 0, startFrame: 0, endFrame: 30 }])).ok, false);
+    assert.equal(created.length, 0);
+  }
+});

@@ -12,7 +12,7 @@ The [Subtitle Generator CEP panel](prototype/cep/README.md) offers an approximat
 
 Generate, Style, Edit and Help tabs separate the workflow, while generation actions and status stay visible. The Generate tab uses compact transcript/grouping sections; Style and Edit use separators for related controls. Style includes searchable local font faces, color swatches with editable hex values, and draggable font-size/position fields that also accept typing. The preview stays visible while Style controls scroll independently. Panel Undo/Redo supports settings history and keyboard shortcuts, with a separate history for each timeline while the panel is open.
 
-The panel reads the active sequence automatically, refreshes before automatic-source generation, and remembers transcript snapshots and appearance/grouping settings per project and sequence. **Refresh from Premiere** rereads corrections; **Use a JSON file instead** retains manual import as a fallback. Saved automatic snapshots are labeled and cannot be generated until refreshed. Single-line word reveal is supported; full-phrase layout with invisible future words and stable multiline wrapping remain pending.
+The panel reads the active sequence automatically, refreshes before automatic-source generation, and remembers transcript snapshots and appearance/grouping settings per project and sequence. **Refresh from Premiere** rereads corrections; **Use a JSON file instead** retains manual import as a fallback. Saved automatic snapshots are labeled and cannot be generated until refreshed. A Default toggle centers a reserved completed-phrase block while preserving left/center/right reveal behavior. One or two lines can be chosen before generation, with a balanced fixed word-boundary split.
 
 [Generator workflow and checks](docs/transcript-generator.md). [Earlier proof and rendered frames](docs/mogrt-proof.md).
 
@@ -36,3 +36,5 @@ These checks exercise transcript parsing, grouping, host guards, selected style 
 - [Implementation plan](docs/plans/2026-11-03-subtitle-graphics-implementation.md)
 
 New sequence styles default to Times New Roman, plain word reveal and a centered anchor at 50% horizontal / 90% vertical. Style offers Left/Center/Right alignment; Reset style applies the defaults to an existing sequence and is undoable. Saved styles remain intact. Animation keyframes are not copied by the current parent-sync operation.
+
+Use **Style > Position > Default** to reserve a centered completed-phrase block: Left reveals from its fixed left edge, Center keeps recentering, and Right grows leftward in spoken order. **Generate > Lines per phrase** chooses one or two fixed lines. Both settings are remembered per timeline and support panel Undo/Redo.

@@ -4,9 +4,10 @@ const { defaults, validate, captionAt, splitHighlight, anchorX } = require('../p
 test('ExtendScript dependencies register globally when loaded from a host method', () => {
   const fs = require('node:fs'), vm = require('node:vm');
   const context = vm.createContext({ $: { global: {} } });
-  for (const file of ['../prototype/cep/appearance.js', '../prototype/identity.js']) vm.runInContext('(function(){' + fs.readFileSync(require.resolve(file), 'utf8') + '}).call({})', context);
+  for (const file of ['../prototype/cep/appearance.js', '../prototype/cep/layout.js', '../prototype/identity.js']) vm.runInContext('(function(){' + fs.readFileSync(require.resolve(file), 'utf8') + '}).call({})', context);
   assert.equal(typeof context.$.global.SubtitleAppearance.validate, 'function');
   assert.equal(typeof context.$.global.SubtitleIdentity.same, 'function');
+  assert.equal(typeof context.$.global.SubtitleLayout.state, 'function');
 });
 test('validates appearance settings without sharing mutable defaults', () => {
   const a = defaults(); a.size = 120;
@@ -16,6 +17,8 @@ test('validates appearance settings without sharing mutable defaults', () => {
   assert.throws(() => validate({ ...a, textColor: 'red' }), /color/);
   assert.throws(() => validate({ ...a, x: 101 }), /position/);
   assert.throws(() => validate({ ...a, mode: 'unknown' }), /reveal/);
+  assert.throws(() => validate({ ...a, lines: 3 }), /line-count/);
+  assert.throws(() => validate({ ...a, centeredReveal: 'true' }), /Default/);
 });
 
 test('new subtitle styles use Times New Roman, plain reveal and a bottom-center anchor', () => {
@@ -31,6 +34,8 @@ test('new subtitle styles use Times New Roman, plain reveal and a bottom-center 
 test('older saved styles retain their previous left alignment', () => {
   const a = defaults(); delete a.alignment;
   assert.equal(validate(a).alignment, 'left');
+  delete a.lines; delete a.centeredReveal;
+  assert.equal(validate(a).lines, 1); assert.equal(validate(a).centeredReveal, false);
 });
 test('preview uses the same word intervals as timeline output and blanks gaps', () => {
   const clips = [{ startFrame: 5, endFrame: 10, text: 'Hello' }, { startFrame: 12, endFrame: 20, text: 'Hello guys' }];

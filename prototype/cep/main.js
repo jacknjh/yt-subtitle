@@ -18,7 +18,7 @@ let settingsTimer;
 let pendingRun = null;
 let settingsHistory = null;
 const settingHistories = new Map();
-const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation', 'alignment'];
+const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation', 'alignment', 'default-layout', 'max-lines'];
 const tabIds = ['generate', 'style', 'edit', 'help'];
 let activeTab = 'generate';
 let styleScroll = 0;
@@ -62,12 +62,12 @@ function renderFonts() {
 }
 
 function appearance() {
-  return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color-hex').value.trim(), highlightColor: element('highlight-color-hex').value.trim(), x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value, alignment: element('alignment').value });
+  return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color-hex').value.trim(), highlightColor: element('highlight-color-hex').value.trim(), x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value, alignment: element('alignment').value, centeredReveal: element('default-layout').checked, lines: Number(element('max-lines').value) });
 }
 
 function host(expression) {
   const root = window.__adobe_cep__.getSystemPath('extension');
-  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==4){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
+  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==5){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
   return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(bootstrap + expression, raw => {
     try {
       if (raw === 'EvalScript error.') throw new Error('Subtitle Generator could not connect to Premiere. Close and reopen this panel, then try again.');
@@ -97,7 +97,9 @@ function controls() {
 function preview() {
   stopPreview();
   const sample = { segments: [{ words: ['Preview', 'your', 'subtitles.'].map((text, i) => ({ text, start: i * .5, duration: .5 })) }] };
-  const plan = planTranscript(loaded ? loaded.data : sample, Number(element('characters').value), element('single-word').checked, loaded ? loaded.context.fps : 30);
+  const source = planTranscript(loaded ? loaded.data : sample, Number(element('characters').value), element('single-word').checked, loaded ? loaded.context.fps : 30);
+  const style = appearance();
+  const plan = SubtitleLayout.plan(source, style, style.centeredReveal || style.lines === 2 ? measureCaption(style) : null);
   if (loaded) element('summary').textContent = plan.wordCount + ' words · ' + plan.phrases.length + ' phrases';
   element('preview').textContent = plan.phrases.slice(0, 5).join('\n');
   renderedPlan = plan;
@@ -128,24 +130,39 @@ function choosePreviewPhrase() {
   drawPreview();
 }
 
-function drawPreview() {
-  const canvas = element('subtitle-preview');
-  const ctx = canvas.getContext && canvas.getContext('2d');
-  if (!ctx || !previewClips.length) return;
-  const style = appearance();
-  ctx.setTransform(canvas.width / 1920, 0, 0, canvas.height / 1080, 0, 0);
-  ctx.fillStyle = '#151515'; ctx.fillRect(0, 0, 1920, 1080);
-  const caption = SubtitleAppearance.captionAt(previewClips, previewClips[0].startFrame + Number(element('preview-time').value));
-  if (!caption) return;
+function measureCaption(style) {
+  const ctx = element('subtitle-preview').getContext('2d');
+  if (!ctx) throw new Error('Subtitle font measurement is unavailable.');
   const font = fontCatalog.find(face => face.postscript === style.font) || { family: style.font, style: 'Regular' };
   const face = font.style || 'Regular';
   const weight = /black|heavy/i.test(face) ? 900 : /extra.?bold/i.test(face) ? 800 : /semi.?bold|demi/i.test(face) ? 600 : /bold/i.test(face) ? 700 : /medium/i.test(face) ? 500 : /light/i.test(face) ? 300 : 400;
   ctx.font = (/italic|oblique/i.test(face) ? 'italic ' : '') + weight + ' ' + style.size + 'px "' + (font.family || style.font).replace(/["\\]/g, '') + '", sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  const x = style.x * 19.2 - ctx.measureText(caption.text).width * SubtitleAppearance.anchorX(style.alignment) / 100, y = style.y * 10.8, text = SubtitleAppearance.splitHighlight(caption.text);
-  ctx.fillStyle = style.textColor; ctx.fillText(text.prefix, x, y);
-  ctx.fillStyle = style.mode === 'reveal-highlight' ? style.highlightColor : style.textColor;
-  ctx.fillText(text.word, x + ctx.measureText(text.prefix).width, y);
+  ctx.textAlign = 'left';
+  // shortcut: local font widths can differ slightly from Premiere; replace when template-native bounds are available.
+  return text => { const m = ctx.measureText(text); return Number.isFinite(m.actualBoundingBoxLeft) && Number.isFinite(m.actualBoundingBoxRight) ? m.actualBoundingBoxLeft + m.actualBoundingBoxRight : m.width; };
+}
+
+function drawPreview() {
+  const canvas = element('subtitle-preview');
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx || !previewClips.length) return;
+  const style = appearance(), measure = measureCaption(style);
+  ctx.setTransform(canvas.width / 1920, 0, 0, canvas.height / 1080, 0, 0);
+  ctx.fillStyle = '#151515'; ctx.fillRect(0, 0, 1920, 1080);
+  const caption = SubtitleAppearance.captionAt(previewClips, previewClips[0].startFrame + Number(element('preview-time').value));
+  if (!caption) return;
+  const layout = SubtitleLayout.state(caption.phraseText, caption.text.trim().split(/\s+/).length, style, measure);
+  const rows = layout.text.split('\r');
+  ctx.textBaseline = layout.anchorY === 0 ? 'alphabetic' : 'middle';
+  const y = layout.anchorY === 0 ? (layout.offset[1] + .5) * 1080 + style.size * .68 : style.y * 10.8;
+  rows.forEach((line, index) => {
+    const metrics = ctx.measureText(line), x = (layout.offset[0] + .5) * 1920 - measure(line) * layout.anchorX / 100 + (metrics.actualBoundingBoxLeft || 0), rowY = y + index * style.size * 1.2;
+    ctx.fillStyle = style.textColor;
+    if (index !== rows.length - 1 || style.mode === 'reveal') { ctx.fillText(line, x, rowY); return; }
+    const text = SubtitleAppearance.splitHighlight(line);
+    ctx.fillText(text.prefix, x, rowY); ctx.fillStyle = style.highlightColor;
+    ctx.fillText(text.word, x + ctx.measureText(text.prefix).width, rowY);
+  });
 }
 
 function animatePreview() {
@@ -272,14 +289,14 @@ element('update-phrase').addEventListener('click', () => {
 });
 
 function updateAppearance(group) {
-  try { appearance(); drawPreview(); recordSettings(group); queueSettingsSave(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
+  try { appearance(); if (group === 'default-layout' || group === 'max-lines') preview(); else drawPreview(); recordSettings(group); queueSettingsSave(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
   catch (error) { stopPreview(); element('status').textContent = error.message; }
 }
 ['font-size', 'position-x', 'position-y'].forEach(id => attachSubtitleScrub(element(id), () => updateAppearance(id), finishSettingsEdit));
 element('reset-style').addEventListener('click', () => {
   if (busy || !settingsHistory) return;
   try {
-    applySettings({ appearance: SubtitleAppearance.defaults(), characters: Number(element('characters').value), singleWord: element('single-word').checked });
+    applySettings({ appearance: { ...SubtitleAppearance.defaults(), lines: Number(element('max-lines').value) }, characters: Number(element('characters').value), singleWord: element('single-word').checked });
     recordSettings('reset-style'); finishSettingsEdit(); queueSettingsSave();
     element('status').textContent = 'Default style applied: Times New Roman, plain word reveal, bottom-center.';
   } catch (error) { element('status').textContent = error.message; }
@@ -340,6 +357,7 @@ function applySettings(settings) {
   for (const [id, value] of [['text-color', style.textColor], ['highlight-color', style.highlightColor]]) { element(id).value = value; element(id + '-hex').value = value; element(id + '-hex').setAttribute('aria-invalid', 'false'); }
   element('position-x').value = style.x; element('position-y').value = style.y; element('animation').value = style.mode;
   element('alignment').value = style.alignment;
+  element('default-layout').checked = style.centeredReveal; element('max-lines').value = style.lines;
   element('characters').value = settings.characters; element('single-word').checked = settings.singleWord;
   preview();
 }

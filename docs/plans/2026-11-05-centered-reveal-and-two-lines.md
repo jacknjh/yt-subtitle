@@ -1,0 +1,9 @@
+# Centered reveal and two-line phrases
+
+Approved behavior: a Default toggle reserves a centered completed-phrase block. Left reveals from its fixed left edge; Center retains centered growing prefixes; Right grows leftward from the block's fixed right edge in normal spoken order. Toggle off preserves existing anchor behavior. Add one/two-line phrases with a split selected from the complete phrase, never by rewrapping each prefix. Keep the whole-phrase character limit and single-track editable word-state graphics.
+
+Use a shared ES3-compatible layout helper for word-boundary balanced splitting and geometry. The browser measures the selected font and supplies the complete phrase width; native generation receives validated text/layout with each word state. Match the canvas preview to the same geometry. Preserve legacy settings by defaulting missing flags to false and one line. Record/save the new appearance settings through the existing undo/session mechanisms.
+
+Real-template probe: explicit carriage returns render two lines. Paragraph Alignment values are 0=center, 1=left, 2=right (the control's stored AE definition is one-based). Line Spacing=0 gives a 1.2×font-size baseline advance. Anchor Y=0 holds the first baseline fixed when a second line is added. Reserve the two-line block above the existing bottom-line position. Validate pixel placement with exports on a temporary sequence; no changes to the user's existing output.
+
+Implementation: failing layout tests, helper, appearance fields and UI; preview/generation integration and installer; native layout validation/application; preserve explicit line breaks in phrase updates and keep clip names single-line. Test undo, old caches, invalid layouts, pause/resume, line break updates and rendered first-line stability. Existing static parent Sync continues to copy actual template controls; it does not recompute reserved widths or word wrapping for differently worded phrases.
