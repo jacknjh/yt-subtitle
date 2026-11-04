@@ -16,9 +16,12 @@ let manualChoosing = false;
 let transcriptError = '';
 let settingsTimer;
 let pendingRun = null;
+let settingsHistory = null;
+const settingHistories = new Map();
 const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation'];
 const tabIds = ['generate', 'style', 'edit', 'help'];
 let activeTab = 'generate';
+let styleScroll = 0;
 const tabScroll = {};
 const standardFonts = [
   { postscript: 'Heebo-SemiBold', label: 'Heebo SemiBold', family: 'Heebo', style: 'SemiBold' },
@@ -31,6 +34,7 @@ const fontCatalog = Array.from(new Map(standardFonts.concat(window.SubtitleFonts
 function showTab(name, focus = false) {
   const content = element('tab-content');
   tabScroll[activeTab] = content.scrollTop || 0;
+  if (activeTab === 'style') styleScroll = element('style-settings').scrollTop || 0;
   if (name !== 'style') stopPreview();
   tabIds.forEach(id => {
     const active = id === name;
@@ -39,7 +43,9 @@ function showTab(name, focus = false) {
     element('panel-' + id).hidden = !active;
   });
   activeTab = name;
+  content.setAttribute('data-tab', name);
   content.scrollTop = tabScroll[name] || 0;
+  if (name === 'style') element('style-settings').scrollTop = styleScroll;
   if (focus) element('tab-' + name).focus();
 }
 
@@ -82,6 +88,9 @@ function controls() {
   element('refresh-transcript').disabled = busy || transcriptReading;
   element('cancel').disabled = !generating;
   element('update-phrase').disabled = busy || !phraseSnapshot;
+  ['characters', 'single-word', 'font-search', 'text-color-hex', 'highlight-color-hex'].concat(appearanceIds).forEach(id => { element(id).disabled = busy || !settingsHistory; });
+  element('undo-settings').disabled = busy || !settingsHistory || !settingsHistory.canUndo();
+  element('redo-settings').disabled = busy || !settingsHistory || !settingsHistory.canRedo();
 }
 
 function preview() {
@@ -157,7 +166,7 @@ function acceptTranscript(json, context, options = {}) {
   element('preview-phrase').value = '';
   preview();
   controls();
-  element('status').textContent = 'Transcript ready. Generation duplicates this sequence and adds editable word graphics to its empty top video track.';
+  element('status').textContent = 'Transcript ready. Generation adds editable word graphics to this sequence’s empty top video track.';
 }
 
 element('load').addEventListener('click', async () => {
@@ -171,7 +180,7 @@ element('load').addEventListener('click', async () => {
 });
 
 ['characters', 'single-word'].forEach(id => element(id).addEventListener('change', () => {
-  try { preview(); queueSettingsSave(); element('status').textContent = 'Phrase grouping updated.'; }
+  try { preview(); recordSettings(id); finishSettingsEdit(); queueSettingsSave(); element('status').textContent = 'Phrase grouping updated.'; }
   catch (error) { element('status').textContent = error.message; }
 }));
 
@@ -261,26 +270,28 @@ element('update-phrase').addEventListener('click', () => {
   return editSelected('YTSubtitle.updatePhrase(' + argument({ ...phraseSnapshot, text: element('phrase-text').value }) + ')');
 });
 
-function updateAppearance() {
-  try { appearance(); drawPreview(); queueSettingsSave(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
+function updateAppearance(group) {
+  try { appearance(); drawPreview(); recordSettings(group); queueSettingsSave(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
   catch (error) { stopPreview(); element('status').textContent = error.message; }
 }
-['font-size', 'position-x', 'position-y'].forEach(id => attachSubtitleScrub(element(id), updateAppearance));
+['font-size', 'position-x', 'position-y'].forEach(id => attachSubtitleScrub(element(id), () => updateAppearance(id), finishSettingsEdit));
 appearanceIds.filter(id => id !== 'text-color' && id !== 'highlight-color').forEach(id => {
-  element(id).addEventListener('input', updateAppearance);
-  element(id).addEventListener('change', updateAppearance);
+  element(id).addEventListener('input', () => updateAppearance(id));
+  element(id).addEventListener('change', () => { updateAppearance(id); finishSettingsEdit(); });
+  element(id).addEventListener('blur', finishSettingsEdit);
 });
 ['text-color', 'highlight-color'].forEach(id => {
   const picker = element(id), hex = element(id + '-hex');
-  function fromPicker() { hex.value = picker.value; hex.setAttribute('aria-invalid', 'false'); updateAppearance(); }
+  function fromPicker() { hex.value = picker.value; hex.setAttribute('aria-invalid', 'false'); updateAppearance(id); }
   function fromHex() {
     const valid = /^#[0-9a-f]{6}$/i.test(hex.value.trim());
     hex.setAttribute('aria-invalid', String(!valid));
     if (valid) picker.value = hex.value.trim().toLowerCase();
-    updateAppearance();
+    updateAppearance(id + '-hex');
   }
-  picker.addEventListener('input', fromPicker); picker.addEventListener('change', fromPicker);
-  hex.addEventListener('input', fromHex); hex.addEventListener('change', fromHex);
+  picker.addEventListener('input', fromPicker); picker.addEventListener('change', () => { fromPicker(); finishSettingsEdit(); });
+  hex.addEventListener('input', fromHex); hex.addEventListener('change', () => { fromHex(); finishSettingsEdit(); });
+  hex.addEventListener('blur', finishSettingsEdit);
 });
 tabIds.forEach((id, index) => {
   element('tab-' + id).addEventListener('click', () => showTab(id));
@@ -323,13 +334,46 @@ function applySettings(settings) {
   preview();
 }
 function queueSettingsSave() { clearTimeout(settingsTimer); settingsTimer = setTimeout(() => { void sessions.save(); }, 500); }
+function recordSettings(group) { if (settingsHistory) settingsHistory.record(currentSettings(), group); controls(); }
+function finishSettingsEdit() { if (settingsHistory) settingsHistory.end(); controls(); }
+function restoreSettingsHistory(direction) {
+  if (busy || !settingsHistory) return;
+  const settings = settingsHistory[direction]();
+  if (!settings) return;
+  applySettings(settings); queueSettingsSave(); controls();
+  element('status').textContent = direction === 'undo' ? 'Undid panel settings.' : 'Redid panel settings.';
+}
+element('undo-settings').addEventListener('click', () => restoreSettingsHistory('undo'));
+element('redo-settings').addEventListener('click', () => restoreSettingsHistory('redo'));
+document.addEventListener('keydown', event => {
+  if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.isComposing) return;
+  const key = event.key.toLowerCase();
+  if (key !== 'z' && key !== 'y') return;
+  const target = event.target || document.activeElement;
+  if (target && (target.isContentEditable || target.tagName === 'TEXTAREA' || (target.tagName === 'INPUT' && ['text', 'search', 'number'].includes(target.type)))) return;
+  event.preventDefault();
+  if (document.body && document.body.classList.contains('scrubbing')) return;
+  restoreSettingsHistory(key === 'y' || event.shiftKey ? 'redo' : 'undo');
+});
+if (typeof window.__adobe_cep__.registerKeyEventsInterest === 'function') {
+  window.__adobe_cep__.registerKeyEventsInterest(JSON.stringify([{ keyCode: 90, ctrlKey: true, shiftKey: false, altKey: false }, { keyCode: 90, ctrlKey: true, shiftKey: true, altKey: false }, { keyCode: 89, ctrlKey: true, shiftKey: false, altKey: false }]));
+}
+settingsHistory = createSettingsHistory(currentSettings());
 const sessions = createTranscriptSessions({
   settings: currentSettings,
   defaults: () => applySettings({ appearance: SubtitleAppearance.defaults(), characters: 24, singleWord: false }),
   apply: applySettings,
   restore: async context => (await host('YTSubtitle.readSession(' + argument(context) + ')')).session,
   save: record => host('YTSubtitle.writeSession(' + argument(record) + ')'),
+  ready(context) {
+    const key = SubtitleIdentity.key(context), settings = currentSettings();
+    let history = settingHistories.get(key);
+    if (!history || JSON.stringify(history.value()) !== JSON.stringify(settings)) history = createSettingsHistory(settings);
+    settingHistories.set(key, history); settingsHistory = history; controls();
+  },
   context(context) {
+    if (settingsHistory) settingsHistory.end();
+    settingsHistory = context ? null : createSettingsHistory(currentSettings());
     loaded = null; transcriptFresh = false; parentReady = false; phraseSnapshot = null;
     element('parent-status').textContent = 'Set a parent in this timeline to sync its graphics.';
     element('sequence-label').textContent = context ? 'Timeline: ' + context.sequenceName : 'Open a project and timeline in Premiere.';

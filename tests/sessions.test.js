@@ -10,7 +10,7 @@ function fixture(store = new Map(), read = async context => ({ context, json: co
   const manager = createSessions({
     settings: () => ({ ...settings }), defaults: () => { settings = { font: 'default' }; }, apply: saved => { settings = { ...saved }; },
     restore: async context => store.get(identity.key(context)), save: async record => store.set(identity.key(record.context), JSON.parse(JSON.stringify(record))), read,
-    context: context => events.push(['context', context]), reading() {}, transcript: (data, context, flags) => events.push(['transcript', context.sequenceId, data.json, flags.fresh]), error: error => errors.push(error.message),
+    context: context => events.push(['context', context]), ready: context => events.push(['ready', context.sequenceId, settings.font]), reading() {}, transcript: (data, context, flags) => events.push(['transcript', context.sequenceId, data.json, flags.fresh]), error: error => errors.push(error.message),
   });
   return { manager, events, errors, store, setFont: value => { settings.font = value; }, font: () => settings.font };
 }
@@ -20,6 +20,13 @@ test('restores each sequence appearance and reads fresh transcript after reopeni
   const reopened = fixture(f.store); await reopened.manager.activate(a); assert.equal(reopened.font(), 'Arial');
   assert.deepEqual(reopened.events.filter(e => e[0] === 'transcript').map(e => e[3]), [false, true]);
   await reopened.manager.activate(b); assert.equal(reopened.font(), 'Heebo');
+});
+
+test('signals settings readiness after restoring a manual snapshot without requiring an automatic read', async () => {
+  const store = new Map([[identity.key(a), { schema: 1, context: a, settings: { font: 'Arial' }, json: 'manual', source: 'manual', capturedAt: 1 }]]);
+  const f = fixture(store, () => assert.fail('Manual snapshot should not trigger a read'));
+  await f.manager.activate(a);
+  assert.deepEqual(f.events.filter(event => event[0] === 'ready'), [['ready', 'a', 'Arial']]);
 });
 test('discards an automatic reply after switching sequences', async () => {
   let finish, started;

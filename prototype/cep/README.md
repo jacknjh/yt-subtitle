@@ -21,3 +21,7 @@ The loopback-only development debugger uses port 9227. The panel has no Node int
 Uninstall **Subtitle Generator Reader** through Creative Cloud Desktop Plugins if removing the companion too. Private snapshots/settings live under `%APPDATA%/Adobe/YTSubtitleGenerator/sessions`; remove that folder only if you want to discard them.
 
 To uninstall the CEP panel, close Premiere and remove only `%APPDATA%/Adobe/CEP/extensions/YTSubtitleProof`. First read `install-state.json` and restore its recorded `previousPlayerDebugMode` under `HKCU/Software/Adobe/CSXS.12`, or remove that property if the previous value was null. Other unsigned panels may depend on that setting.
+
+The Style preview stays pinned above scrolling settings in a narrow panel and beside them in a wide panel. The preview has its own scroll area on very short panels so its transport controls remain reachable. Other tabs retain their normal scrolling.
+
+Header Undo/Redo and Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y restore panel appearance and phrase grouping. A complete drag or committed field edit is one step; canceled drags leave no entry. Focused text/number fields retain native text undo. Histories are isolated per project/sequence and last while this panel remains open; saved settings persist, but undo history does not survive reload. These controls do not undo timeline operations; use Premiere’s own undo with its timeline focused.

@@ -50,6 +50,7 @@
       } catch (error) { if (mine === epoch) adapter.error(error, { cacheOnly: true }); }
       if (mine !== epoch) return false;
       ready = true;
+      if (adapter.ready) adapter.ready(current);
       if (options.refresh !== false && (!snapshot || snapshot.source !== 'manual')) return refresh();
       return true;
     }
@@ -59,7 +60,7 @@
       ++epoch; ++readEpoch; adapter.reading(false);
       const next = { json, source: 'manual', capturedAt: Date.now() };
       adapter.transcript(next, context, { fresh: true, cached: false });
-      snapshot = next; ready = true; await save(); return true;
+      snapshot = next; ready = true; if (adapter.ready) adapter.ready(current); await save(); return true;
     }
     async function clear() {
       const mine = ++epoch; ++readEpoch;

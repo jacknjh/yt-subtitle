@@ -8,11 +8,12 @@ const SubtitleAppearance = require('../prototype/cep/appearance');
 function panel(respond) {
   const elements = {};
   const initial = { characters: '24', font: 'Heebo-SemiBold', 'font-size': '85', 'text-color': '#ebebeb', 'highlight-color': '#fffe00', 'text-color-hex': '#ebebeb', 'highlight-color-hex': '#fffe00', 'position-x': '15', 'position-y': '80', animation: 'reveal-highlight' };
-  const document = { addEventListener() {}, createElement() { return {}; }, getElementById(id) {
+  const listeners = {};
+  const document = { addEventListener(name, handler) { (listeners[name] ||= []).push(handler); }, createElement() { return {}; }, getElementById(id) {
     return elements[id] ||= { ownerDocument: document, value: initial[id] || '', checked: false, textContent: '', disabled: false, events: {}, setAttribute(key, value) { this[key] = value; }, focus() { this.focused = true; }, appendChild() {}, addEventListener(event, callback) { this.events[event] = callback; } };
   } };
   const calls = [];
-  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, attachSubtitleScrub: require('../prototype/cep/scrub'), createTranscriptSessions: require('../prototype/cep/sessions'), setTimeout, clearTimeout, window: {
+  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, SubtitleIdentity: require('../prototype/identity'), createSettingsHistory: require('../prototype/cep/history'), attachSubtitleScrub: require('../prototype/cep/scrub'), createTranscriptSessions: require('../prototype/cep/sessions'), setTimeout, clearTimeout, window: {
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     SubtitleFonts: [{ postscript: 'Example-Bold', label: 'Example Bold', family: 'Example', style: 'Bold' }],
     proofConfig: { templatePath: 'template.mogrt' },
@@ -21,7 +22,7 @@ function panel(respond) {
   vm.runInContext(fs.readFileSync(require.resolve('../prototype/cep/main.js'), 'utf8'), context);
   const data = { segments: [{ words: Array.from({ length: 7 }, (_, i) => ({ text: 'word', start: i, duration: .5 })) }] };
   const source = { sequenceId: 'source', sequenceName: 'Edit', projectPath: 'edit.prproj', fps: 30 };
-  return { elements, calls, context, data, source, accept() { context.acceptTranscript(JSON.stringify(data), source); } };
+  return { elements, calls, context, data, source, key(event) { for (const listener of listeners.keydown || []) listener(event); }, accept() { context.acceptTranscript(JSON.stringify(data), source); } };
 }
 
 test('generates in small batches, reports completion and restores controls', async () => {
@@ -148,13 +149,62 @@ test('dragging an appearance value uses the existing preview and settings handle
   for (const id of ['position-x', 'position-y']) assert.equal(typeof p.elements[id].events.pointerdown, 'function');
 });
 
+test('settings undo groups typed changes and redo reapplies the preview value', () => {
+  const p = panel(() => ({ ok: true }));
+  const field = p.elements['font-size'];
+  for (const value of ['9', '95', '100']) { field.value = value; field.events.input(); }
+  field.events.change();
+  p.elements['undo-settings'].events.click();
+  assert.equal(Number(field.value), 85);
+  assert.equal(p.elements['redo-settings'].disabled, false);
+  p.elements['redo-settings'].events.click();
+  assert.equal(Number(field.value), 100);
+});
+
+test('panel shortcuts undo settings while text editors retain native undo', () => {
+  const p = panel(() => ({ ok: true }));
+  p.elements['position-x'].value = '25'; p.elements['position-x'].events.change();
+  let prevented = false;
+  const event = target => ({ key: 'z', ctrlKey: true, target, preventDefault() { prevented = true; } });
+  p.key(event({ tagName: 'TEXTAREA' }));
+  assert.equal(prevented, false); assert.equal(Number(p.elements['position-x'].value), 25);
+  p.key(event({ tagName: 'BUTTON' }));
+  assert.equal(prevented, true); assert.equal(Number(p.elements['position-x'].value), 15);
+  p.key({ ...event({ tagName: 'BUTTON' }), shiftKey: true });
+  assert.equal(Number(p.elements['position-x'].value), 25);
+});
+
+test('each sequence retains its own settings history after switching timelines', async () => {
+  const saved = new Map();
+  const p = panel(expression => {
+    const call = expression.match(/YTSubtitle\.(readSession|writeSession)\((.*)\)$/);
+    assert(call, expression);
+    const value = JSON.parse(call[2]);
+    if (call[1] === 'writeSession') { saved.set(value.context.sequenceId, value); return { ok: true }; }
+    return { ok: true, session: saved.get(value.sequenceId) || null };
+  });
+  const a = { ...p.source, projectId: 'project', sequenceId: 'a' }, b = { ...a, sequenceId: 'b' };
+  const activate = context => vm.runInContext('sessions.activate(' + JSON.stringify(context) + ',{refresh:false})', p.context);
+  await activate(a);
+  p.elements['font-size'].value = '95'; p.elements['font-size'].events.change();
+  await activate(b);
+  assert.equal(p.elements['undo-settings'].disabled, true);
+  p.elements['font-size'].value = '77'; p.elements['font-size'].events.change();
+  await activate(a);
+  assert.equal(Number(p.elements['font-size'].value), 95);
+  p.elements['undo-settings'].events.click();
+  assert.equal(Number(p.elements['font-size'].value), 85);
+  await activate(b);
+  assert.equal(Number(p.elements['font-size'].value), 77);
+});
+
 test('tabs preserve settings and support arrow-key navigation while pausing hidden previews', () => {
   const p = panel(() => ({ ok: true }));
   p.elements['font-size'].value = '100';
   p.elements['tab-style'].events.click();
   assert.equal(p.elements['panel-style'].hidden, false);
   assert.equal(p.elements['panel-generate'].hidden, true);
-  p.elements['tab-content'].scrollTop = 120;
+  p.elements['style-settings'].scrollTop = 120;
   p.elements['preview-play'].events.click();
   p.elements['tab-style'].events.keydown({ key: 'ArrowRight', preventDefault() {} });
   assert.equal(p.elements['tab-edit']['aria-selected'], 'true');
@@ -162,7 +212,7 @@ test('tabs preserve settings and support arrow-key navigation while pausing hidd
   assert.equal(p.elements['preview-play'].textContent, 'Play preview');
   assert.equal(p.elements['tab-content'].scrollTop, 0);
   p.elements['tab-style'].events.click();
-  assert.equal(p.elements['tab-content'].scrollTop, 120);
+  assert.equal(p.elements['style-settings'].scrollTop, 120);
   assert.equal(p.elements['font-size'].value, '100');
 });
 

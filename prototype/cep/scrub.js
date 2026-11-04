@@ -1,5 +1,5 @@
 (function (root) {
-  function attachSubtitleScrub(input, update) {
+  function attachSubtitleScrub(input, update, complete = () => {}) {
     const document = input.ownerDocument;
     let drag = null;
     function finish(cancel) {
@@ -7,6 +7,7 @@
       const previous = drag; drag = null;
       document.body.classList.remove('scrubbing');
       if (cancel && previous.moved) { input.value = previous.original; update(); }
+      complete();
       try { input.releasePointerCapture(previous.id); } catch {}
       if (!cancel && !previous.moved) { input.focus(); input.select(); }
     }
