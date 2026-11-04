@@ -1,11 +1,9 @@
-if (typeof JSON === 'undefined' && typeof $ !== 'undefined') {
-    $.evalFile(new File($.fileName).parent.fsName + '/vendor/json2.js');
-}
-if (typeof SubtitleAppearance === 'undefined' && typeof $ !== 'undefined') {
-    $.evalFile(new File($.fileName).parent.fsName + '/appearance.js');
-}
-
 var YTSubtitle = (function () {
+    function initialize(extensionPath) {
+        // The first manifest-loaded JSX cannot reliably use $.fileName to locate its dependencies.
+        if (typeof JSON === 'undefined') $.evalFile(new File(extensionPath + '/vendor/json2.js'));
+        if (typeof SubtitleAppearance === 'undefined') $.evalFile(new File(extensionPath + '/appearance.js'));
+    }
     function timeAtTicks(ticks) { var value = new Time(); value.ticks = String(ticks); return value; }
 
     function changeText(parameter, text) {
@@ -406,5 +404,5 @@ var YTSubtitle = (function () {
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
-    return { inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase };
+    return { initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase };
 }());

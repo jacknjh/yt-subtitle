@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function host({ unsupportedText = false, failInsertAt = -1, templateExists = true, withoutJson = false, timebase = '8467200000' } = {}) {
+function host({ unsupportedText = false, failInsertAt = -1, templateExists = true, withoutJson = false, initialize = true, timebase = '8467200000' } = {}) {
   const original = { name: 'Original edit', sequenceID: 'original', importMGT() { assert.fail('must not insert into the original sequence'); } };
   const created = [];
   const imported = [];
@@ -48,12 +48,13 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
   } };
   const context = {
     app: { project }, JSON: withoutJson ? undefined : JSON, Date, Error, isFinite,
-    File: function(path) { this.exists = templateExists; this.fsName = path.replace(/\//g, '\\'); this.parent = { fsName: require('node:path').resolve(__dirname, '../prototype/cep') }; },
+    File: function(path) { this.fullName = path; this.exists = templateExists; this.fsName = path.replace(/\//g, '\\'); this.parent = { fsName: require('node:path').resolve(__dirname, '../prototype/cep') }; },
     Time: function() { this.seconds = 0; Object.defineProperty(this, 'ticks', { get() { return String(this.seconds * 254016000000); }, set(value) { this.seconds = Number(value) / 254016000000; } }); },
   };
-  context.$ = { fileName: require.resolve('../prototype/cep/host.jsx'), evalFile(path) { vm.runInContext(fs.readFileSync(path, 'utf8'), context); } };
+  context.$ = { fileName: '', evalFile(file) { vm.runInContext(fs.readFileSync(file.fullName || file, 'utf8'), context); } };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(require.resolve('../prototype/cep/host.jsx'), 'utf8'), context);
+  if (initialize) context.YTSubtitle.initialize(require('node:path').resolve(__dirname, '../prototype/cep'));
   original.timebase = timebase;
   original.videoTracks = { numTracks: 2, 0: { clips: { numItems: 0 } }, 1: { clips: { numItems: 0 } } };
   project.path = 'test.prproj';
@@ -122,6 +123,13 @@ test('loads the standard JSON polyfill on ExtendScript hosts without native JSON
   const result = JSON.parse(api.createProof(options));
   assert.equal(result.ok, true);
   assert.equal(result.clips.length, 3);
+});
+
+test('fresh startup does not need $.fileName and dependencies load through explicit initialization', () => {
+  const { api } = host({ withoutJson: true, initialize: false });
+  assert.equal(JSON.parse(api.createProof(options)).ok, false);
+  api.initialize(require('node:path').resolve(__dirname, '../prototype/cep'));
+  assert.equal(JSON.parse(api.createProof(options)).ok, true);
 });
 
 test('passes the native preset path to Premiere rather than slash-form input', () => {

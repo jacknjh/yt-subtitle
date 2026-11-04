@@ -54,8 +54,11 @@ function appearance() {
 }
 
 function host(expression) {
-  return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(expression, raw => {
+  const root = window.__adobe_cep__.getSystemPath('extension');
+  const bootstrap = 'if(typeof YTSubtitle==="undefined"||typeof YTSubtitle.initialize!=="function"){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
+  return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(bootstrap + expression, raw => {
     try {
+      if (raw === 'EvalScript error.') throw new Error('Subtitle Generator could not connect to Premiere. Close and reopen this panel, then try again.');
       const result = JSON.parse(raw);
       if (!result.ok) throw new Error(result.error || 'Premiere operation failed.');
       resolve(result);
@@ -153,6 +156,7 @@ element('load').addEventListener('click', async () => {
   try {
     const result = await host('YTSubtitle.loadTranscript()');
     if (!result.cancelled) acceptTranscript(result.json, result.context);
+    else element('status').textContent = 'No JSON file selected. Choose an exported transcript JSON file; the panel does not read Premiere’s transcript automatically.';
   } catch (error) { element('status').textContent = error.message; }
   finally { busy = false; controls(); }
 });

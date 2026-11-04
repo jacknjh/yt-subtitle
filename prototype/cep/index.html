@@ -68,9 +68,9 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <main id="tab-content">
 <section id="panel-generate" role="tabpanel" aria-labelledby="tab-generate" tabindex="0">
 <h2>Source transcript</h2>
-<p class="muted">Open your source sequence, then load its transcript JSON. Words and timings come from the transcript.</p>
-<button id="load">Load transcript JSON</button>
-<p id="summary">No transcript loaded. Captions and SRT are not required.</p>
+<p class="muted">Open your source sequence, then choose its exported transcript JSON file. This panel does not fetch Premiere's transcript automatically.</p>
+<button id="load">Choose transcript JSON file</button>
+<p id="summary">No transcript JSON loaded in this panel. Loaded files are cleared when Premiere or the panel restarts.</p>
 <h2 class="section">Phrase grouping</h2>
 <div class="fields"><div class="field"><label for="characters">Characters per phrase</label><input id="characters" type="number" min="1" max="200" value="24"></div>
 <label class="check"><input id="single-word" type="checkbox"> One word at a time</label></div>
@@ -113,7 +113,7 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <section id="panel-help" role="tabpanel" aria-labelledby="tab-help" tabindex="0" hidden>
 <h2>Using the generator</h2>
 <dl>
-<dt>Load transcript JSON</dt><dd>Reads words and their timings for the active source sequence. First read and save its JSON using the UXP transcript panel.</dd>
+<dt>Choose transcript JSON file</dt><dd>Opens an exported JSON file for the active source sequence. First read and save its JSON using the UXP transcript panel. Having a transcript in Premiere does not load it here automatically. Choose the file again after restarting Premiere.</dd>
 <dt>Style and preview</dt><dd>Choose a phrase, play or scrub its timing, then adjust appearance. The preview is approximate and does not modify timeline graphics.</dd>
 <dt>Fonts and colors</dt><dd>Search local font faces, then choose one from the dropdown. Click a color swatch to open its picker, or type a six-digit hex color. New fonts appear after rerunning the panel installer.</dd>
 <dt>Generate subtitles</dt><dd>Creates a duplicate sequence with editable word graphics on an empty top video track. Your source sequence is preserved.</dd>

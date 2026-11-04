@@ -6,7 +6,7 @@ Tested in Premiere 26.2.2 on Windows. The tested landscape subtitle MOGRT is a s
 
 1. Generate the source sequence transcript in Premiere.
 2. In the UXP compatibility panel, read that sequence's transcript and save its JSON. No captions or SRT export is required.
-3. With the same source sequence active, load that JSON in **Window > Extensions > Subtitle Generator**. The menu label updates after restarting Premiere; an already open panel can keep its old tab label until then.
+3. With the same source sequence active, use **Choose transcript JSON file** in **Window > Extensions > Subtitle Generator**. This opens a file chooser, not a direct read from Premiere. Loaded JSON is held in panel memory and must be chosen again after restarting Premiere or reloading the panel. The menu label updates after restarting Premiere; an already open panel can keep its old tab label until then.
 4. Set characters per phrase or single-word mode. An individual long word stays whole. Sentence endings and pauses longer than one second also start a phrase.
 5. Adjust the approximate preview's font, size, text/highlight colors, position and word reveal mode. Play or scrub a phrase to inspect timing. These controls apply to newly generated graphics; existing graphics use the parent sync workflow below.
 6. Ensure the source sequence has an empty top video track. Generate duplicates the complete video/audio sequence and inserts editable MOGRT word states on that track. The source is never cleared or saved automatically.
@@ -24,7 +24,7 @@ To fix a phrase, select one generated graphic and choose **Read selected phrase*
 
 ## Verification and remaining work
 
-48 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
+51 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
 
 Live style capture/application and phrase updates succeeded. The reloaded panel's Read selected phrase button populated `Hello, guys.` and enabled phrase editing. Final video frame exports showed `Hello,` followed by `Hello, guys.` in the lower part of the frame with the newest word highlighted. Existing source captions and the earlier native test title remain visible separately.
 
@@ -48,7 +48,7 @@ The canvas preview uses the same planned word intervals and settings, but browse
 
 | Control | Effect |
 | --- | --- |
-| Load transcript JSON | Load exported sequence words and timings and bind them to the active source sequence. |
+| Choose transcript JSON file | Open a previously exported JSON file and bind its words/timings to the active source sequence. This does not fetch Premiere's transcript. |
 | Characters per phrase | Group whole words by maximum phrase length. Sentence endings and long pauses can split earlier. |
 | One word at a time | Generate one visible word per graphic instead of growing phrases. |
 | Preview phrase | Choose which grouped phrase to preview. |
@@ -74,5 +74,11 @@ The old font field was a four-item datalist in CEP's Chromium 99 renderer. The r
 The installer refreshes the local catalog when Node is available; otherwise the panel retains standard choices. Fonts in Adobe-private locations and named variable-font instances may be absent. Rerun the installer to refresh fonts after adding them.
 
 Live keyboard checks passed for arrow/Home/End tab navigation. All tabs were checked at widths 280, 420 and 800 pixels: no horizontal overflow and the action/status footer remained visible. This UI update did not generate or change timeline graphics.
+
+## Restart initialization fix
+
+After a fresh Premiere launch, even `1+1` returned `EvalScript error.` through the panel bridge. The first manifest-loaded JSX was resolving dependencies through `$.fileName`, which Adobe documents as unreliable on the first loaded JSX. The manifest script now defines the host API without loading dependencies. Each browser host call supplies the extension path from CEP and explicitly initializes the JSON/appearance helpers before the requested operation. No inferred current working directory is used.
+
+The live bridge recovered after installing the fix: `1+1` returned 2 and the active-sequence context returned valid JSON. Clicking the file button opened the native `Load Premiere transcript JSON` chooser. Canceling it restored the controls and showed explicit file-selection guidance. Tests cover initialization with no JSON and an empty `$.fileName`, the explicit browser path, cancellation feedback and a readable native-bridge error. Neither direct transcript fetching nor transcript persistence is implemented by this startup fix.
 
 Not verified: a full ten-minute run using the new reuse path, undo grouping, reopening the saved project, other Premiere versions, non-Landscape templates, or large selections for style/phrase edits. The panel manifest currently restricts loading to Premiere 26.2.x–26.x. Automatic transcript transfer, saved per-sequence sessions, arbitrary animation authoring, and a redistributable template remain outstanding.

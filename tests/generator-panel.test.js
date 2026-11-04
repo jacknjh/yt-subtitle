@@ -16,7 +16,7 @@ function panel(respond) {
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     SubtitleFonts: [{ postscript: 'Example-Bold', label: 'Example Bold', family: 'Example', style: 'Bold' }],
     proofConfig: { templatePath: 'template.mogrt' },
-    __adobe_cep__: { evalScript(expression, callback) { calls.push(expression); callback(JSON.stringify(respond(expression, elements))); } },
+    __adobe_cep__: { getSystemPath: () => 'file:///C:/Extension%20folder', evalScript(expression, callback) { calls.push(expression); const report = respond(expression, elements); callback(typeof report === 'string' ? report : JSON.stringify(report)); } },
   } });
   vm.runInContext(fs.readFileSync(require.resolve('../prototype/cep/main.js'), 'utf8'), context);
   const data = { segments: [{ words: Array.from({ length: 7 }, (_, i) => ({ text: 'word', start: i, duration: .5 })) }] };
@@ -26,7 +26,7 @@ function panel(respond) {
 
 test('generates in small batches, reports completion and restores controls', async () => {
   let inserted = 0;
-  const p = panel(expression => expression.startsWith('YTSubtitle.beginGeneration') ? { ok: true, sequenceId: 'copy', sequenceName: 'Copy' } : { ok: true, total: inserted += inserted ? 2 : 5 });
+  const p = panel(expression => expression.includes('YTSubtitle.beginGeneration(') ? { ok: true, sequenceId: 'copy', sequenceName: 'Copy' } : { ok: true, total: inserted += inserted ? 2 : 5 });
   assert.equal(p.elements.generate.disabled, true);
   p.accept();
   assert.equal(p.elements.generate.disabled, false);
@@ -42,7 +42,7 @@ test('generates in small batches, reports completion and restores controls', asy
 
 test('stopping leaves completed batches and reports the partial result', async () => {
   const p = panel((expression, elements) => {
-    if (expression.startsWith('YTSubtitle.beginGeneration')) return { ok: true, sequenceId: 'copy', sequenceName: 'Copy' };
+    if (expression.includes('YTSubtitle.beginGeneration(')) return { ok: true, sequenceId: 'copy', sequenceName: 'Copy' };
     elements.cancel.events.click();
     return { ok: true, total: 5 };
   });
@@ -53,7 +53,7 @@ test('stopping leaves completed batches and reports the partial result', async (
 });
 
 test('a host error reports the duplicate containing partial graphics', async () => {
-  const p = panel(expression => expression.startsWith('YTSubtitle.beginGeneration') ? { ok: true, sequenceId: 'copy', sequenceName: 'Copy' } : { ok: false, error: 'Sequence changed' });
+  const p = panel(expression => expression.includes('YTSubtitle.beginGeneration(') ? { ok: true, sequenceId: 'copy', sequenceName: 'Copy' } : { ok: false, error: 'Sequence changed' });
   p.accept();
   await p.elements.generate.events.click();
   assert.match(p.elements.status.textContent, /Sequence changed.*Partial graphics remain/);
@@ -64,10 +64,10 @@ test('parent buttons call the playhead and latest-style APIs and enable sync onl
   const p = panel(expression => ({ ok: true, parentName: 'Subtitle 2: Hello', note: expression }));
   assert.equal(p.elements['apply-style'].disabled, true);
   await p.elements['capture-style'].events.click();
-  assert.equal(p.calls[0], 'YTSubtitle.setParentFromPlayhead()');
+  assert(p.calls[0].endsWith('YTSubtitle.setParentFromPlayhead()'));
   assert.equal(p.elements['apply-style'].disabled, false);
   await p.elements['apply-style'].events.click();
-  assert.equal(p.calls[1], 'YTSubtitle.syncSelectedToParent()');
+  assert(p.calls[1].endsWith('YTSubtitle.syncSelectedToParent()'));
 });
 
 test('invalid appearance stops generation before any host mutation', async () => {
@@ -133,4 +133,19 @@ test('font search preserves the chosen font until a different face is selected',
   assert.match(p.elements['font-status'].textContent, /1 matching/);
   p.elements.font.value = 'Example-Bold'; p.elements.font.events.change();
   assert.match(p.elements.status.textContent, /Appearance updated/);
+});
+
+test('host calls initialize dependencies from the extension path before the requested operation', async () => {
+  const p = panel(() => ({ ok: true, cancelled: true }));
+  await p.elements.load.events.click();
+  assert.match(p.calls[0], /YTSubtitle\.initialize\("file:\/\/\/C:\/Extension%20folder"\);YTSubtitle\.loadTranscript/);
+  assert.match(p.elements.status.textContent, /No JSON file selected/);
+  assert.equal(p.elements.generate.disabled, true);
+});
+
+test('native startup errors display recovery instructions instead of a JSON parsing error', async () => {
+  const p = panel(() => 'EvalScript error.');
+  await p.elements.load.events.click();
+  assert.match(p.elements.status.textContent, /could not connect to Premiere/);
+  assert.doesNotMatch(p.elements.status.textContent, /Unexpected token/);
 });

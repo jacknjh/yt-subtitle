@@ -14,6 +14,8 @@ When Node is available, the installer reads font names from standard Windows sys
 
 Transcript reading currently uses the separate [UXP panel](../README.md). Automatic transcript transfer is still missing. The former three-word test remains available as a host diagnostic, but the panel now exposes the real generator.
 
+**Choose transcript JSON file** opens a saved export; it does not fetch the transcript visible in Premiere. The loaded export is held in memory and must be chosen again after a panel/Premiere restart. Host calls initialize helper scripts using CEP's explicit extension path so a fresh launch does not depend on `$.fileName`.
+
 The loopback-only development debugger uses port 9227. The panel has no Node integration or network access.
 
 To uninstall, close Premiere and remove only `%APPDATA%/Adobe/CEP/extensions/YTSubtitleProof`. First read `install-state.json` and restore its recorded `previousPlayerDebugMode` under `HKCU/Software/Adobe/CSXS.12`, or remove that property if the previous value was null. Other unsigned panels may depend on that setting.
