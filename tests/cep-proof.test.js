@@ -51,7 +51,11 @@ function host({ unsupportedText = false, failInsertAt = -1, templateExists = tru
     File: function(path) { this.fullName = path; this.exists = templateExists; this.fsName = path.replace(/\//g, '\\'); this.parent = { fsName: require('node:path').resolve(__dirname, '../prototype/cep') }; },
     Time: function() { this.seconds = 0; Object.defineProperty(this, 'ticks', { get() { return String(this.seconds * 254016000000); }, set(value) { this.seconds = Number(value) / 254016000000; } }); },
   };
-  context.$ = { fileName: '', evalFile(file) { vm.runInContext(fs.readFileSync(file.fullName || file, 'utf8'), context); } };
+  context.$ = { fileName: '', evalFile(file) {
+    let name = file.fullName || file;
+    if (require('node:path').basename(name) === 'identity.js') name = require.resolve('../prototype/identity.js');
+    vm.runInContext(fs.readFileSync(name, 'utf8'), context);
+  } };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(require.resolve('../prototype/cep/host.jsx'), 'utf8'), context);
   if (initialize) context.YTSubtitle.initialize(require('node:path').resolve(__dirname, '../prototype/cep'));

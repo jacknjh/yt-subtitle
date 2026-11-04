@@ -1,6 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { defaults, validate, captionAt, splitHighlight } = require('../prototype/cep/appearance');
+test('ExtendScript dependencies register globally when loaded from a host method', () => {
+  const fs = require('node:fs'), vm = require('node:vm');
+  const context = vm.createContext({ $: { global: {} } });
+  for (const file of ['../prototype/cep/appearance.js', '../prototype/identity.js']) vm.runInContext('(function(){' + fs.readFileSync(require.resolve(file), 'utf8') + '}).call({})', context);
+  assert.equal(typeof context.$.global.SubtitleAppearance.validate, 'function');
+  assert.equal(typeof context.$.global.SubtitleIdentity.same, 'function');
+});
 test('validates appearance settings without sharing mutable defaults', () => {
   const a = defaults(); a.size = 120;
   assert.equal(defaults().size, 85);

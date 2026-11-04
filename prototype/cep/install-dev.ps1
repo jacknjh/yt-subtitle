@@ -1,4 +1,6 @@
+param([switch]$InstallReader)
 $ErrorActionPreference = 'Stop'
+if ($InstallReader) { & (Join-Path $PSScriptRoot '../install-reader.ps1') }
 $templateName = '16' + [char]0x2022 + '9 Karaoke Subtitles.mogrt'
 $templatePath = Join-Path $env:APPDATA ('Adobe/Common/Motion Graphics Templates/Captioneer/Landscape/' + $templateName)
 $presetPath = 'C:/Program Files/Adobe/Adobe Premiere Pro 2026/Settings/SequencePresets/Legacy/Digital SLR/1080p/DSLR 1080p30.sqpreset'
@@ -21,9 +23,10 @@ if (-not (Test-Path -LiteralPath $statePath)) {
         ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding utf8
 }
 
-foreach ($file in @('index.html', 'main.js', 'planner.js', 'appearance.js', 'font-data.js', 'host.jsx', '.debug')) {
+foreach ($file in @('index.html', 'main.js', 'planner.js', 'appearance.js', 'sessions.js', 'font-data.js', 'host.jsx', 'bridge.jsx', '.debug')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $installPath $file) -Force
 }
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../identity.js') -Destination (Join-Path $installPath 'identity.js') -Force
 if (Get-Command node -ErrorAction SilentlyContinue) {
     & node (Join-Path $PSScriptRoot 'scan-fonts.cjs') (Join-Path $installPath 'font-data.js')
     if ($LASTEXITCODE -ne 0) { Write-Warning 'Local font scan failed; the panel will use its standard font choices.' }

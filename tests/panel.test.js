@@ -23,7 +23,7 @@ function panel({ read = async () => ({ json: '{"segments":[]}', wordCount: 1 }),
     },
   };
   vm.runInNewContext(readFileSync(require.resolve('../prototype/main.js'), 'utf8'), {
-    require: name => ({ premierepro: ppro, uxp, './probe.js': { readSequenceTranscript: read } })[name],
+    require: name => ({ premierepro: ppro, uxp, './probe.js': { readSequenceTranscript: read }, './reader.js': require('../prototype/reader.js') })[name],
     document: { getElementById(id) {
       if (!elements.has(id)) elements.set(id, { disabled: false, value: '', addEventListener(type, callback) { this[type] = callback; } });
       return elements.get(id);

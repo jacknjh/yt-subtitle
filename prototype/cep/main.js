@@ -10,6 +10,11 @@ let previewClips = [];
 let previewPlaying = false;
 let previewRequest = 0;
 let previewStarted = 0;
+let transcriptFresh = false;
+let transcriptReading = false;
+let manualChoosing = false;
+let transcriptError = '';
+let settingsTimer;
 const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation'];
 const tabIds = ['generate', 'style', 'edit', 'help'];
 let activeTab = 'generate';
@@ -55,7 +60,7 @@ function appearance() {
 
 function host(expression) {
   const root = window.__adobe_cep__.getSystemPath('extension');
-  const bootstrap = 'if(typeof YTSubtitle==="undefined"||typeof YTSubtitle.initialize!=="function"){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
+  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==2){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
   return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(bootstrap + expression, raw => {
     try {
       if (raw === 'EvalScript error.') throw new Error('Subtitle Generator could not connect to Premiere. Close and reopen this panel, then try again.');
@@ -71,7 +76,8 @@ function argument(value) { return JSON.stringify(value).replace(/\u2028/g, '\\u2
 function controls() {
   ['load', 'characters', 'single-word', 'capture-style', 'read-phrase', 'phrase-text', 'preview-play', 'preview-time', 'preview-phrase', 'font-search', 'text-color-hex', 'highlight-color-hex'].concat(appearanceIds).forEach(id => { element(id).disabled = busy; });
   element('apply-style').disabled = busy || !parentReady;
-  element('generate').disabled = busy || !loaded;
+  element('generate').disabled = busy || transcriptReading || !loaded || !transcriptFresh;
+  element('refresh-transcript').disabled = busy || transcriptReading;
   element('cancel').disabled = !generating;
   element('update-phrase').disabled = busy || !phraseSnapshot;
 }
@@ -139,12 +145,13 @@ function animatePreview() {
 }
 
 // Also used by the development transcript reader; file loading binds to the active sequence.
-function acceptTranscript(json, context) {
+function acceptTranscript(json, context, options = {}) {
   loaded = null;
   controls();
   const data = JSON.parse(json.replace(/^\uFEFF/, ''));
   planTranscript(data, Number(element('characters').value), element('single-word').checked, context.fps);
-  loaded = { data, context };
+  loaded = { data, context, source: options.source || 'manual' };
+  transcriptFresh = options.fresh !== false;
   element('preview-phrase').value = '';
   preview();
   controls();
@@ -152,17 +159,17 @@ function acceptTranscript(json, context) {
 }
 
 element('load').addEventListener('click', async () => {
-  busy = true; controls();
+  busy = true; manualChoosing = true; sessions.cancelRead(); controls();
   try {
     const result = await host('YTSubtitle.loadTranscript()');
-    if (!result.cancelled) acceptTranscript(result.json, result.context);
+    if (!result.cancelled) await sessions.manual(result.json, result.context);
     else element('status').textContent = 'No JSON file selected. Choose an exported transcript JSON file; the panel does not read Premiere’s transcript automatically.';
   } catch (error) { element('status').textContent = error.message; }
-  finally { busy = false; controls(); }
+  finally { busy = false; manualChoosing = false; controls(); }
 });
 
 ['characters', 'single-word'].forEach(id => element(id).addEventListener('change', () => {
-  try { preview(); element('status').textContent = 'Phrase grouping updated.'; }
+  try { preview(); queueSettingsSave(); element('status').textContent = 'Phrase grouping updated.'; }
   catch (error) { element('status').textContent = error.message; }
 }));
 
@@ -173,6 +180,8 @@ element('generate').addEventListener('click', async () => {
   let created = null;
   let inserted = 0;
   try {
+    busy = true; controls();
+    if (loaded.source === 'premiere' && !await sessions.refresh()) throw new Error(transcriptError || 'Could not refresh this timeline transcript.');
     const plan = preview();
     const settings = appearance();
     if (!window.proofConfig) throw new Error('The local subtitle template has not been configured.');
@@ -226,7 +235,7 @@ element('update-phrase').addEventListener('click', () => {
 });
 
 function updateAppearance() {
-  try { appearance(); drawPreview(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
+  try { appearance(); drawPreview(); queueSettingsSave(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
   catch (error) { stopPreview(); element('status').textContent = error.message; }
 }
 appearanceIds.filter(id => id !== 'text-color' && id !== 'highlight-color').forEach(id => {
@@ -269,6 +278,75 @@ element('preview-play').addEventListener('click', () => {
   animatePreview();
 });
 renderFonts();
+function currentSettings() {
+  const characters = Number(element('characters').value);
+  if (!Number.isInteger(characters) || characters < 1 || characters > 200) throw new Error('Choose a valid phrase length.');
+  return { appearance: appearance(), characters, singleWord: element('single-word').checked };
+}
+function applySettings(settings) {
+  const style = SubtitleAppearance.validate(settings.appearance);
+  if (!Number.isInteger(settings.characters) || settings.characters < 1 || settings.characters > 200 || typeof settings.singleWord !== 'boolean') throw new Error('Saved phrase settings were invalid.');
+  if (!fontCatalog.some(font => font.postscript === style.font)) fontCatalog.push({ postscript: style.font, label: style.font, family: style.font, style: 'Regular' });
+  element('font-search').value = ''; renderFonts();
+  element('font').value = style.font; element('font-size').value = style.size;
+  for (const [id, value] of [['text-color', style.textColor], ['highlight-color', style.highlightColor]]) { element(id).value = value; element(id + '-hex').value = value; element(id + '-hex').setAttribute('aria-invalid', 'false'); }
+  element('position-x').value = style.x; element('position-y').value = style.y; element('animation').value = style.mode;
+  element('characters').value = settings.characters; element('single-word').checked = settings.singleWord;
+  preview();
+}
+function queueSettingsSave() { clearTimeout(settingsTimer); settingsTimer = setTimeout(() => { void sessions.save(); }, 500); }
+const sessions = createTranscriptSessions({
+  settings: currentSettings,
+  defaults: () => applySettings({ appearance: SubtitleAppearance.defaults(), characters: 24, singleWord: false }),
+  apply: applySettings,
+  restore: async context => (await host('YTSubtitle.readSession(' + argument(context) + ')')).session,
+  save: record => host('YTSubtitle.writeSession(' + argument(record) + ')'),
+  context(context) {
+    loaded = null; transcriptFresh = false; parentReady = false; phraseSnapshot = null;
+    element('parent-status').textContent = 'Set a parent in this timeline to sync its graphics.';
+    element('sequence-label').textContent = context ? 'Timeline: ' + context.sequenceName : 'Open a project and timeline in Premiere.';
+    element('summary').textContent = context ? 'Reading this timeline’s transcript…' : 'No active timeline.';
+    element('transcript-source').textContent = ''; controls();
+  },
+  reading(value) { transcriptReading = value; if (value) { transcriptError = ''; element('transcript-source').textContent = 'Reading current transcript from Premiere…'; } controls(); },
+  async read(context) {
+    if (manualChoosing) throw new Error('Manual JSON selection is in progress.');
+    const ticket = await host('YTSubtitle.requestTranscript(' + argument(context) + ')');
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+      if (manualChoosing) throw new Error('Manual JSON selection is in progress.');
+      const result = await host('YTSubtitle.pollTranscript(' + argument(ticket.requestId) + ')');
+      if (!result.pending) return result;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    throw new Error('The transcript reader did not reply. Refresh again, or choose a JSON file.');
+  },
+  transcript(record, context, flags) {
+    acceptTranscript(record.json, context, { source: record.source, fresh: flags.fresh });
+    const label = record.source === 'manual' ? 'Manual JSON snapshot' : flags.cached ? 'Cached Premiere transcript; refreshing…' : 'Current Premiere transcript';
+    element('transcript-source').textContent = label + (record.capturedAt ? ' (' + new Date(record.capturedAt).toLocaleTimeString() + ')' : '');
+    element('status').textContent = flags.fresh ? 'Transcript ready for this timeline. Settings are remembered automatically.' : 'Showing cached words while the current transcript is read.';
+  },
+  error(error, options) {
+    if (manualChoosing) return;
+    if (!options.cacheOnly) { transcriptError = error.message; if (!loaded || loaded.source !== 'manual') transcriptFresh = false; element('transcript-source').textContent = loaded ? 'Saved snapshot shown; current Premiere transcript unavailable.' : 'No current transcript loaded.'; }
+    element('status').textContent = (options.cacheOnly ? 'Could not remember sequence settings: ' : '') + error.message;
+    controls();
+  },
+});
+element('refresh-transcript').addEventListener('click', async () => {
+  try { const result = await host('YTSubtitle.getContext()'); await sessions.activate(result.context, { refresh: false }); await sessions.refresh(); }
+  catch (error) { element('status').textContent = error.message; }
+});
+let checkingContext = false;
+async function watchContext() {
+  if (busy || checkingContext) return;
+  checkingContext = true;
+  try { const result = await host('YTSubtitle.getContext()'); element('sequence-label').textContent = 'Timeline: ' + result.context.sequenceName; await sessions.activate(result.context); }
+  catch (error) { await sessions.clear(); element('status').textContent = error.message; }
+  finally { checkingContext = false; }
+}
 preview();
 showTab('generate');
 controls();
+if (typeof window.setInterval === 'function') { void watchContext(); window.setInterval(watchContext, 1000); }

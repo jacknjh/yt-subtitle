@@ -1,6 +1,8 @@
-# Load the compatibility prototype
+# Transcript reader and compatibility diagnostics
 
-This panel reads Premiere data. It does not insert, trim, delete, or modify timeline items. JSON files are written only when you choose a Save action and a destination. No network connection is used by the panel.
+For normal use, run `./prototype/cep/install-dev.ps1 -InstallReader` from the repository root, save your project and restart Premiere once. **Subtitle Generator Reader** starts in the background; the CEP Subtitle Generator reads its local request/reply files automatically. Developer Tools are only needed for the diagnostic/development setup below. The reader writes heartbeat/request/reply files inside its own plugin-data folder; it does not modify the project.
+
+This panel reads Premiere data. It does not insert, trim, delete, or modify timeline items. Diagnostic exports are written only when you choose Save; background transfer uses private plugin-data files. No network connection is used by the panel.
 
 ## Setup
 
@@ -8,7 +10,7 @@ This panel reads Premiere data. It does not insert, trim, delete, or modify time
 2. In Premiere, open **Edit > Preferences > Plugins** and enable developer mode. Follow any restart instruction shown by Premiere.
 3. Install/open **UXP Developer Tools 2.2 or later** using Adobe's supported setup process. Enable developer mode in the developer tool if requested.
 4. In UXP Developer Tools, add an existing plugin and choose **this directory's `manifest.json`**. Load it into Premiere.
-5. Open **Window > UXP Plugins > Subtitle Compatibility** if the panel did not open automatically.
+5. Open **Window > UXP Plugins > Subtitle Generator Reader** if the panel did not open automatically.
 
 Official [development-tool setup](https://developer.adobe.com/premiere-pro/uxp/introduction/essentials/dev-tools/) and [first-plugin loading guide](https://developer.adobe.com/premiere-pro/uxp/plugins/). If loading fails, record the error and installed UDT version; do not edit the manifest to claim a different host or runtime.
 

@@ -68,9 +68,12 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <main id="tab-content">
 <section id="panel-generate" role="tabpanel" aria-labelledby="tab-generate" tabindex="0">
 <h2>Source transcript</h2>
-<p class="muted">Open your source sequence, then choose its exported transcript JSON file. This panel does not fetch Premiere's transcript automatically.</p>
-<button id="load">Choose transcript JSON file</button>
-<p id="summary">No transcript JSON loaded in this panel. Loaded files are cleared when Premiere or the panel restarts.</p>
+<p id="sequence-label" class="muted">Detecting the active timeline…</p>
+<p class="muted">The active timeline's transcript is read automatically. Generate its transcript in Premiere first, then refresh after text or timing corrections.</p>
+<button id="refresh-transcript">Refresh from Premiere</button>
+<p id="transcript-source" class="muted" role="status"></p>
+<p id="summary">Connecting to Premiere’s transcript reader…</p>
+<details><summary>Use a JSON file instead</summary><p class="muted">Manual fallback for an exported transcript. This choice and its settings are remembered for this timeline until you refresh from Premiere.</p><button id="load">Choose transcript JSON file</button></details>
 <h2 class="section">Phrase grouping</h2>
 <div class="fields"><div class="field"><label for="characters">Characters per phrase</label><input id="characters" type="number" min="1" max="200" value="24"></div>
 <label class="check"><input id="single-word" type="checkbox"> One word at a time</label></div>
@@ -113,7 +116,9 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <section id="panel-help" role="tabpanel" aria-labelledby="tab-help" tabindex="0" hidden>
 <h2>Using the generator</h2>
 <dl>
-<dt>Choose transcript JSON file</dt><dd>Opens an exported JSON file for the active source sequence. First read and save its JSON using the UXP transcript panel. Having a transcript in Premiere does not load it here automatically. Choose the file again after restarting Premiere.</dd>
+<dt>Automatic transcript</dt><dd>The active project and timeline are detected automatically. A background reader fetches the current transcript. Refresh after correcting words or timings; generation also refreshes automatic transcripts before creating graphics.</dd>
+<dt>Remembered settings</dt><dd>Appearance, phrase grouping and transcript snapshots are saved separately for each project and timeline. Cached Premiere words are refreshed before generation. A saved manual JSON choice stays manual until you refresh from Premiere.</dd>
+<dt>Choose transcript JSON file</dt><dd>The Generate tab's JSON fallback opens a previously exported transcript. Use it when a native transcript is unavailable or you want to supply your own data.</dd>
 <dt>Style and preview</dt><dd>Choose a phrase, play or scrub its timing, then adjust appearance. The preview is approximate and does not modify timeline graphics.</dd>
 <dt>Fonts and colors</dt><dd>Search local font faces, then choose one from the dropdown. Click a color swatch to open its picker, or type a six-digit hex color. New fonts appear after rerunning the panel installer.</dd>
 <dt>Generate subtitles</dt><dd>Creates a duplicate sequence with editable word graphics on an empty top video track. Your source sequence is preserved.</dd>
@@ -127,7 +132,7 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <div class="generate-row"><button id="generate" disabled>Generate subtitles</button><button id="cancel" disabled>Stop</button></div>
 <progress id="generation-progress" max="1" value="0" hidden aria-label="Subtitle generation progress"></progress>
 <p id="progress-label" class="muted"></p>
-<p id="status" role="status" aria-live="polite">Load a transcript to begin. Choose appearance in the Style tab.</p>
+<p id="status" role="status" aria-live="polite">Connecting to the active timeline. Choose appearance in the Style tab.</p>
 </footer>
-<script src="config.js"></script><script src="planner.js"></script><script src="appearance.js"></script><script src="font-data.js"></script><script src="main.js"></script>
+<script src="config.js"></script><script src="planner.js"></script><script src="appearance.js"></script><script src="identity.js"></script><script src="sessions.js"></script><script src="font-data.js"></script><script src="main.js"></script>
 </body></html>

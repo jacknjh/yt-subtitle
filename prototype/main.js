@@ -1,12 +1,19 @@
 const ppro = require('premierepro');
 const uxp = require('uxp');
-const { readSequenceTranscript, inspectSelectedGraphic } = require('./probe.js');
+const { activeContext, readSequenceTranscript, inspectSelectedGraphic } = require('./probe.js');
+const { startReader } = require('./reader.js');
 const element = id => document.getElementById(id);
 let report = null;
 let transcript = null;
 let busy = false;
 let revision = 0;
 const registeredEvents = [];
+let readerService = null;
+if (typeof uxp.storage.localFileSystem.getDataFolder === 'function') {
+  startReader({ fs: uxp.storage.localFileSystem, context: () => activeContext(ppro), read: () => readSequenceTranscript(ppro), onStatus: message => { element('reader-status').textContent = message; } })
+    .then(service => { readerService = service; })
+    .catch(error => { element('reader-status').textContent = 'Reader could not start: ' + String(error.message || error); });
+}
 
 function updateButtons() {
   element('transcript').disabled = busy;
@@ -90,7 +97,7 @@ element('graphic').addEventListener('click', () => run(inspectSelectedGraphic));
 element('save-report').addEventListener('click', () => save('report'));
 element('save-transcript').addEventListener('click', () => save('transcript'));
 
-uxp.entrypoints.setup({ panels: { subtitleProbe: {
+uxp.entrypoints.setup({ plugin: { destroy() { if (readerService) readerService.stop(); unsubscribe(); } }, panels: { subtitleProbe: {
   show() {
     if (registeredEvents.length) return;
     try {

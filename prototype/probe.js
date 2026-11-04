@@ -7,12 +7,13 @@ async function activeContext(ppro) {
     project, sequence,
     projectId: project.guid.toString(), sequenceId: sequence.guid.toString(),
     projectName: project.name, sequenceName: sequence.name,
+    projectPath: project.path || '',
   };
 }
 
 async function assertCurrent(ppro, context) {
   const current = await activeContext(ppro);
-  if (current.projectId !== context.projectId || current.sequenceId !== context.sequenceId) {
+  if (current.projectId !== context.projectId || current.sequenceId !== context.sequenceId || current.projectPath !== context.projectPath) {
     throw new Error('The active project or sequence changed. Run the check again.');
   }
 }
@@ -21,6 +22,7 @@ function identity(context) {
   return {
     projectId: context.projectId, sequenceId: context.sequenceId,
     projectName: context.projectName, sequenceName: context.sequenceName,
+    projectPath: context.projectPath,
   };
 }
 

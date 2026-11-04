@@ -3,7 +3,11 @@ var YTSubtitle = (function () {
         // The first manifest-loaded JSX cannot reliably use $.fileName to locate its dependencies.
         if (typeof JSON === 'undefined') $.evalFile(new File(extensionPath + '/vendor/json2.js'));
         if (typeof SubtitleAppearance === 'undefined') $.evalFile(new File(extensionPath + '/appearance.js'));
+        if (typeof SubtitleIdentity === 'undefined') $.evalFile(new File(extensionPath + '/identity.js'));
+        if (typeof createSubtitleBridge === 'undefined') $.evalFile(new File(extensionPath + '/bridge.jsx'));
+        if (!bridge) bridge = createSubtitleBridge(context);
     }
+    var bridge = null;
     function timeAtTicks(ticks) { var value = new Time(); value.ticks = String(ticks); return value; }
 
     function changeText(parameter, text) {
@@ -74,7 +78,7 @@ var YTSubtitle = (function () {
     function context() {
         var sequence = app.project && app.project.activeSequence;
         if (!sequence) throw new Error('Open the sequence containing your transcript first.');
-        return { sequenceId: sequence.sequenceID, sequenceName: sequence.name, projectPath: app.project.path, fps: 254016000000 / Number(sequence.timebase) };
+        return { projectId: app.project.documentID, sequenceId: sequence.sequenceID, sequenceName: sequence.name, projectPath: app.project.path, fps: 254016000000 / Number(sequence.timebase) };
     }
 
     function getContext() {
@@ -404,5 +408,10 @@ var YTSubtitle = (function () {
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
-    return { initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase };
+    return { apiVersion: 2, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
+        requestTranscript: function (context) { return bridge.requestTranscript(context); },
+        pollTranscript: function (id) { return bridge.pollTranscript(id); },
+        readSession: function (context) { return bridge.readSession(context); },
+        writeSession: function (session) { return bridge.writeSession(session); }
+    };
 }());

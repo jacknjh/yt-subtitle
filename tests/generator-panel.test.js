@@ -12,7 +12,7 @@ function panel(respond) {
     return elements[id] ||= { value: initial[id] || '', checked: false, textContent: '', disabled: false, events: {}, setAttribute(key, value) { this[key] = value; }, focus() { this.focused = true; }, appendChild() {}, addEventListener(event, callback) { this.events[event] = callback; } };
   } };
   const calls = [];
-  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, setTimeout, window: {
+  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, createTranscriptSessions: require('../prototype/cep/sessions'), setTimeout, clearTimeout, window: {
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     SubtitleFonts: [{ postscript: 'Example-Bold', label: 'Example Bold', family: 'Example', style: 'Bold' }],
     proofConfig: { templatePath: 'template.mogrt' },
@@ -21,7 +21,7 @@ function panel(respond) {
   vm.runInContext(fs.readFileSync(require.resolve('../prototype/cep/main.js'), 'utf8'), context);
   const data = { segments: [{ words: Array.from({ length: 7 }, (_, i) => ({ text: 'word', start: i, duration: .5 })) }] };
   const source = { sequenceId: 'source', sequenceName: 'Edit', projectPath: 'edit.prproj', fps: 30 };
-  return { elements, calls, accept() { context.acceptTranscript(JSON.stringify(data), source); } };
+  return { elements, calls, context, data, source, accept() { context.acceptTranscript(JSON.stringify(data), source); } };
 }
 
 test('generates in small batches, reports completion and restores controls', async () => {
@@ -148,4 +148,38 @@ test('native startup errors display recovery instructions instead of a JSON pars
   await p.elements.load.events.click();
   assert.match(p.elements.status.textContent, /could not connect to Premiere/);
   assert.doesNotMatch(p.elements.status.textContent, /Unexpected token/);
+});
+
+test('automatic refresh loads Premiere words and blocks generation when the latest read fails', async () => {
+  const source = { projectId: 'project', projectPath: 'edit.prproj', sequenceId: 'source', sequenceName: 'Edit', fps: 30 };
+  let fail = false, writes = 0;
+  const p = panel(expression => {
+    if (expression.includes('YTSubtitle.getContext(')) return { ok: true, context: source };
+    if (expression.includes('YTSubtitle.readSession(')) return { ok: true, session: null };
+    if (expression.includes('YTSubtitle.requestTranscript(')) return fail ? { ok: false, error: 'Reader unavailable' } : { ok: true, requestId: 'request' };
+    if (expression.includes('YTSubtitle.pollTranscript(')) return { ok: true, context: source, json: JSON.stringify(p.data), capturedAt: Date.now() };
+    if (expression.includes('YTSubtitle.writeSession(')) { writes++; return { ok: true }; }
+    assert.fail('Unexpected host operation: ' + expression);
+  });
+  await p.elements['refresh-transcript'].events.click();
+  assert.equal(p.elements.generate.disabled, false);
+  assert.match(p.elements['transcript-source'].textContent, /Current Premiere transcript/);
+  assert.equal(writes, 1);
+  fail = true;
+  await p.elements['refresh-transcript'].events.click();
+  assert.equal(p.elements.generate.disabled, true);
+  assert.match(p.elements.status.textContent, /Reader unavailable/);
+  assert.match(p.elements['transcript-source'].textContent, /snapshot/);
+});
+
+test('manual chooser remains usable when the automatic reader is unavailable', async () => {
+  const p = panel(expression => {
+    if (expression.includes('YTSubtitle.loadTranscript(')) return { ok: true, context: { ...p.source, projectId: 'project' }, json: JSON.stringify(p.data) };
+    if (expression.includes('YTSubtitle.readSession(')) return { ok: true, session: null };
+    if (expression.includes('YTSubtitle.writeSession(')) return { ok: true };
+    assert.fail('Manual choice must not request the reader: ' + expression);
+  });
+  await p.elements.load.events.click();
+  assert.equal(p.elements.generate.disabled, false);
+  assert.match(p.elements['transcript-source'].textContent, /Manual JSON snapshot/);
 });

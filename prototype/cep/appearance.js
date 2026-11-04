@@ -20,4 +20,4 @@
   function splitHighlight(text) { var at = text.lastIndexOf(' ') + 1; return { prefix: text.slice(0, at), word: text.slice(at) }; }
   var api = { defaults: defaults, validate: validate, captionAt: captionAt, splitHighlight: splitHighlight };
   if (typeof module !== 'undefined') module.exports = api; else root.SubtitleAppearance = api;
-}(this));
+}(typeof $ !== 'undefined' && $.global ? $.global : this));

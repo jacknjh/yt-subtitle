@@ -5,14 +5,14 @@ Tested in Premiere 26.2.2 on Windows. The tested landscape subtitle MOGRT is a s
 ## Workflow
 
 1. Generate the source sequence transcript in Premiere.
-2. In the UXP compatibility panel, read that sequence's transcript and save its JSON. No captions or SRT export is required.
-3. With the same source sequence active, use **Choose transcript JSON file** in **Window > Extensions > Subtitle Generator**. This opens a file chooser, not a direct read from Premiere. Loaded JSON is held in panel memory and must be chosen again after restarting Premiere or reloading the panel. The menu label updates after restarting Premiere; an already open panel can keep its old tab label until then.
+2. Install the background reader once with `./prototype/cep/install-dev.ps1 -InstallReader`, then save and restart Premiere. No captions or SRT export is required.
+3. Open **Window > Extensions > Subtitle Generator**. The active sequence transcript loads automatically. **Refresh from Premiere** rereads corrections; generation also refreshes an automatic source before creating graphics. **Use a JSON file instead** provides the manual fallback.
 4. Set characters per phrase or single-word mode. An individual long word stays whole. Sentence endings and pauses longer than one second also start a phrase.
 5. Adjust the approximate preview's font, size, text/highlight colors, position and word reveal mode. Play or scrub a phrase to inspect timing. These controls apply to newly generated graphics; existing graphics use the parent sync workflow below.
 6. Ensure the source sequence has an empty top video track. Generate duplicates the complete video/audio sequence and inserts editable MOGRT word states on that track. The source is never cleared or saved automatically.
 7. Use **Stop** to finish the current batch and retain partial output. Switching sequence/project stops the next write. A stopped run cannot resume through the panel; start again from the original source.
 
-The developer session can inject the UXP transcript directly for testing. This is not a shipped automatic bridge and must not be presented as one.
+The reader uses local files inside its own plugin-data folder, with no network service or broad filesystem permission. Requests and responses include project/sequence identity and a unique request/session ID. Sequence changes discard pending replies. Settings and snapshots are stored privately per project GUID, project path and sequence GUID under `%APPDATA%/Adobe/YTSubtitleGenerator/sessions`. A cached automatic transcript is labeled and cannot be used for generation until refreshed. Manual JSON stays a manual override after reopening until Refresh is chosen. Parent selection remains temporary.
 
 ## Editing
 
@@ -24,7 +24,7 @@ To fix a phrase, select one generated graphic and choose **Read selected phrase*
 
 ## Verification and remaining work
 
-51 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
+68 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
 
 Live style capture/application and phrase updates succeeded. The reloaded panel's Read selected phrase button populated `Hello, guys.` and enabled phrase editing. Final video frame exports showed `Hello,` followed by `Hello, guys.` in the lower part of the frame with the newest word highlighted. Existing source captions and the earlier native test title remain visible separately.
 
@@ -48,6 +48,7 @@ The canvas preview uses the same planned word intervals and settings, but browse
 
 | Control | Effect |
 | --- | --- |
+| Refresh from Premiere | Reread the active sequence transcript directly from Premiere. |
 | Choose transcript JSON file | Open a previously exported JSON file and bind its words/timings to the active source sequence. This does not fetch Premiere's transcript. |
 | Characters per phrase | Group whole words by maximum phrase length. Sentence endings and long pauses can split earlier. |
 | One word at a time | Generate one visible word per graphic instead of growing phrases. |
@@ -79,6 +80,12 @@ Live keyboard checks passed for arrow/Home/End tab navigation. All tabs were che
 
 After a fresh Premiere launch, even `1+1` returned `EvalScript error.` through the panel bridge. The first manifest-loaded JSX was resolving dependencies through `$.fileName`, which Adobe documents as unreliable on the first loaded JSX. The manifest script now defines the host API without loading dependencies. Each browser host call supplies the extension path from CEP and explicitly initializes the JSON/appearance helpers before the requested operation. No inferred current working directory is used.
 
-The live bridge recovered after installing the fix: `1+1` returned 2 and the active-sequence context returned valid JSON. Clicking the file button opened the native `Load Premiere transcript JSON` chooser. Canceling it restored the controls and showed explicit file-selection guidance. Tests cover initialization with no JSON and an empty `$.fileName`, the explicit browser path, cancellation feedback and a readable native-bridge error. Neither direct transcript fetching nor transcript persistence is implemented by this startup fix.
+The live bridge recovered after installing the fix: `1+1` returned 2 and the active-sequence context returned valid JSON. Clicking the file button opened the native `Load Premiere transcript JSON` chooser. Canceling it restored the controls and showed explicit file-selection guidance. Tests cover initialization with no JSON and an empty `$.fileName`, the explicit browser path, cancellation feedback and a readable native-bridge error. Direct transcript fetching and persistence were added separately in the automatic-reader update below.
 
-Not verified: a full ten-minute run using the new reuse path, undo grouping, reopening the saved project, other Premiere versions, non-Landscape templates, or large selections for style/phrase edits. The panel manifest currently restricts loading to Premiere 26.2.x–26.x. Automatic transcript transfer, saved per-sequence sessions, arbitrary animation authoring, and a redistributable template remain outstanding.
+Not verified: a full ten-minute run using the new reuse path, undo grouping, reopening the saved project, other Premiere versions, non-Landscape templates, or large selections for style/phrase edits. The panel manifest currently restricts loading to Premiere 26.2.xÃ¢â‚¬â€œ26.x. Arbitrary animation authoring and a redistributable template remain outstanding.
+
+## Automatic reader, November 4
+
+The installed reader transfers the live active-sequence transcript into CEP. A live read returned 1,205 timed words without a JSON chooser and without regenerating or changing timeline graphics. Panel reload restored saved appearance/grouping settings. Automated checks cover request identity, expired requests, sequence changes during reads, stale snapshot gating, manual overrides and per-sequence restoration. The bridge normalizes Windows extended paths because Premiereâ€™s UXP and CEP APIs format the same project path differently.
+
+A normal Premiere restart is the remaining installation check: the live development-session result does not by itself verify installed startup behavior.

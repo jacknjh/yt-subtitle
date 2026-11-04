@@ -4,7 +4,7 @@ An extension in development for editable animated subtitles in Premiere. The app
 
 ## Current status
 
-The CEP panel now generates editable, word-timed MOGRT graphics from Premiere transcript JSON. It groups whole words by character limit (or shows one word at a time), duplicates the source sequence, and inserts growing phrase prefixes on an empty top video track. Generation runs in stoppable batches. A separate UXP panel reads the sequence transcript.
+The CEP panel now generates editable, word-timed MOGRT graphics from Premiere transcript JSON. It groups whole words by character limit (or shows one word at a time), duplicates the source sequence, and inserts growing phrase prefixes on an empty top video track. Generation runs in stoppable batches. An installed background UXP reader transfers the active sequence transcript directly to the generator.
 
 [Load and run the prototype](prototype/README.md). [Compatibility findings and pending checks](docs/premiere-compatibility.md).
 
@@ -12,7 +12,7 @@ The [Subtitle Generator CEP panel](prototype/cep/README.md) offers an approximat
 
 Generate, Style, Edit and Help tabs separate the workflow, while generation actions and status stay visible. The Style tab includes searchable local font faces and color swatches with editable hex values.
 
-Automatic transfer between the transcript reader and generator is still missing. Current setup requires reading/saving JSON in the UXP panel, then loading it in the CEP panel. Sequence sessions and settings are not persisted. Single-line word reveal is supported; full-phrase layout with invisible future words and stable multiline wrapping remain pending.
+The panel reads the active sequence automatically, refreshes before automatic-source generation, and remembers transcript snapshots and appearance/grouping settings per project and sequence. **Refresh from Premiere** rereads corrections; **Use a JSON file instead** retains manual import as a fallback. Saved automatic snapshots are labeled and cannot be generated until refreshed. Single-line word reveal is supported; full-phrase layout with invisible future words and stable multiline wrapping remain pending.
 
 [Generator workflow and checks](docs/transcript-generator.md). [Earlier proof and rendered frames](docs/mogrt-proof.md).
 
