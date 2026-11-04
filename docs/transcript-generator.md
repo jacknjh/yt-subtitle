@@ -24,7 +24,7 @@ To fix a phrase, select one generated graphic and choose **Read selected phrase*
 
 ## Verification and remaining work
 
-42 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
+48 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
 
 Live style capture/application and phrase updates succeeded. The reloaded panel's Read selected phrase button populated `Hello, guys.` and enabled phrase editing. Final video frame exports showed `Hello,` followed by `Hello, guys.` in the lower part of the frame with the newest word highlighted. Existing source captions and the earlier native test title remain visible separately.
 
@@ -44,6 +44,8 @@ The canvas preview uses the same planned word intervals and settings, but browse
 
 ## Buttons and controls
 
+**Generate** contains transcript loading and phrase grouping. **Style** contains the preview and appearance controls. **Edit** contains parent synchronization and phrase corrections. **Help** explains the workflow. Generate/Stop, progress and status remain visible on every tab. Tab changes preserve settings and each tab's scroll position; moving away from Style pauses its preview.
+
 | Control | Effect |
 | --- | --- |
 | Load transcript JSON | Load exported sequence words and timings and bind them to the active source sequence. |
@@ -59,6 +61,18 @@ The canvas preview uses the same planned word intervals and settings, but browse
 | Sync selected to parent | Copy the parent's latest style to currently selected graphics; preserve words and timing. |
 | Read selected phrase | Load the full phrase associated with one selected generated graphic. |
 | Update phrase text | Rewrite its word-prefix graphics using the corrected phrase, retaining current clip boundaries. |
-| What do these buttons do? | Expand the in-panel usage guide. |
+| Search fonts / Font face | Filter local font faces and choose one from a native dropdown. Searching retains the current choice until another face is selected. |
+| Color swatch / hex field | Open a native picker from the swatch, or enter #RRGGBB directly. Labels and surrounding space do not open the picker. |
+| Help tab | Read the in-panel usage guide. |
+
+## Panel interaction checks, November 4
+
+The previous color input was wrapped in a large label. In the actual CEP renderer, clicking that label activated the native color input. The replacement uses non-clickable text labels with accessible names on individual swatches and separate hex fields. Trusted mouse checks confirmed zero picker activations from label/gap/hex clicks and one activation from the swatch. Hex edits update the swatch, and native-picker input/change events update the hex field.
+
+The old font field was a four-item datalist in CEP's Chromium 99 renderer. The replacement is a native select plus search. The development installer indexed 542 local font faces from Windows system/user font files, reading display/family/style names separately from the PostScript identifier used by Premiere. No font files or user font inventory are stored in the repository. Native keyboard selection of Arial changed the actual appearance value to ArialMT. The preview uses the font's family and style metadata.
+
+The installer refreshes the local catalog when Node is available; otherwise the panel retains standard choices. Fonts in Adobe-private locations and named variable-font instances may be absent. Rerun the installer to refresh fonts after adding them.
+
+Live keyboard checks passed for arrow/Home/End tab navigation. All tabs were checked at widths 280, 420 and 800 pixels: no horizontal overflow and the action/status footer remained visible. This UI update did not generate or change timeline graphics.
 
 Not verified: a full ten-minute run using the new reuse path, undo grouping, reopening the saved project, other Premiere versions, non-Landscape templates, or large selections for style/phrase edits. The panel manifest currently restricts loading to Premiere 26.2.x–26.x. Automatic transcript transfer, saved per-sequence sessions, arbitrary animation authoring, and a redistributable template remain outstanding.

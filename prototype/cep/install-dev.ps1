@@ -21,9 +21,13 @@ if (-not (Test-Path -LiteralPath $statePath)) {
         ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding utf8
 }
 
-foreach ($file in @('index.html', 'main.js', 'planner.js', 'appearance.js', 'host.jsx', '.debug')) {
+foreach ($file in @('index.html', 'main.js', 'planner.js', 'appearance.js', 'font-data.js', 'host.jsx', '.debug')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $installPath $file) -Force
 }
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    & node (Join-Path $PSScriptRoot 'scan-fonts.cjs') (Join-Path $installPath 'font-data.js')
+    if ($LASTEXITCODE -ne 0) { Write-Warning 'Local font scan failed; the panel will use its standard font choices.' }
+} else { Write-Output 'Node is unavailable; using the standard font choices.' }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CSXS/manifest.xml') -Destination (Join-Path $installPath 'CSXS/manifest.xml') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'vendor/json2.js') -Destination (Join-Path $installPath 'vendor/json2.js') -Force
 $config = @{ templatePath = $templatePath; presetPath = $presetPath } | ConvertTo-Json -Compress

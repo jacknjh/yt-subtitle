@@ -10,6 +10,8 @@ The CEP panel now generates editable, word-timed MOGRT graphics from Premiere tr
 
 The [Subtitle Generator CEP panel](prototype/cep/README.md) offers an approximate animated preview and appearance controls before generation. It also syncs selected graphics to the latest style of a parent chosen under the playhead, and updates phrase text while retaining timeline boundaries. It imports the installed Karaoke MOGRT once per run and reuses independent editable instances, with a progress bar and Stop control. That template is not distributed. Its installer records the prior CEP developer setting.
 
+Generate, Style, Edit and Help tabs separate the workflow, while generation actions and status stay visible. The Style tab includes searchable local font faces and color swatches with editable hex values.
+
 Automatic transfer between the transcript reader and generator is still missing. Current setup requires reading/saving JSON in the UXP panel, then loading it in the CEP panel. Sequence sessions and settings are not persisted. Single-line word reveal is supported; full-phrase layout with invisible future words and stable multiline wrapping remain pending.
 
 [Generator workflow and checks](docs/transcript-generator.md). [Earlier proof and rendered frames](docs/mogrt-proof.md).

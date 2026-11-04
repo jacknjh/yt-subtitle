@@ -11,9 +11,46 @@ let previewPlaying = false;
 let previewRequest = 0;
 let previewStarted = 0;
 const appearanceIds = ['font', 'font-size', 'text-color', 'highlight-color', 'position-x', 'position-y', 'animation'];
+const tabIds = ['generate', 'style', 'edit', 'help'];
+let activeTab = 'generate';
+const tabScroll = {};
+const standardFonts = [
+  { postscript: 'Heebo-SemiBold', label: 'Heebo SemiBold', family: 'Heebo', style: 'SemiBold' },
+  { postscript: 'ArialMT', label: 'Arial', family: 'Arial', style: 'Regular' },
+  { postscript: 'Arial-BoldMT', label: 'Arial Bold', family: 'Arial', style: 'Bold' },
+  { postscript: 'TimesNewRomanPSMT', label: 'Times New Roman', family: 'Times New Roman', style: 'Regular' },
+];
+const fontCatalog = Array.from(new Map(standardFonts.concat(window.SubtitleFonts || []).filter(font => typeof font.postscript === 'string' && typeof font.label === 'string').map(font => [font.postscript, font])).values()).sort((a, b) => a.label.localeCompare(b.label));
+
+function showTab(name, focus = false) {
+  const content = element('tab-content');
+  tabScroll[activeTab] = content.scrollTop || 0;
+  if (name !== 'style') stopPreview();
+  tabIds.forEach(id => {
+    const active = id === name;
+    element('tab-' + id).setAttribute('aria-selected', String(active));
+    element('tab-' + id).tabIndex = active ? 0 : -1;
+    element('panel-' + id).hidden = !active;
+  });
+  activeTab = name;
+  content.scrollTop = tabScroll[name] || 0;
+  if (focus) element('tab-' + name).focus();
+}
+
+function renderFonts() {
+  const select = element('font'), selected = select.value || 'Heebo-SemiBold';
+  const query = element('font-search').value.trim().toLocaleLowerCase();
+  const matches = fontCatalog.filter(font => [font.label, font.family, font.style, font.postscript].join(' ').toLocaleLowerCase().includes(query));
+  const current = fontCatalog.find(font => font.postscript === selected) || { postscript: selected, label: selected };
+  const choices = matches.some(font => font.postscript === selected) ? matches : [current].concat(matches);
+  select.innerHTML = '';
+  choices.forEach(font => { const option = document.createElement('option'); option.value = font.postscript; option.textContent = font.label; select.appendChild(option); });
+  select.value = selected;
+  element('font-status').textContent = query ? matches.length + ' matching font faces. Current selection is retained.' : fontCatalog.length + ' font faces available.';
+}
 
 function appearance() {
-  return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color').value, highlightColor: element('highlight-color').value, x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value });
+  return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color-hex').value.trim(), highlightColor: element('highlight-color-hex').value.trim(), x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value });
 }
 
 function host(expression) {
@@ -29,7 +66,7 @@ function host(expression) {
 function argument(value) { return JSON.stringify(value).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'); }
 
 function controls() {
-  ['load', 'characters', 'single-word', 'capture-style', 'read-phrase', 'phrase-text', 'preview-play', 'preview-time', 'preview-phrase'].concat(appearanceIds).forEach(id => { element(id).disabled = busy; });
+  ['load', 'characters', 'single-word', 'capture-style', 'read-phrase', 'phrase-text', 'preview-play', 'preview-time', 'preview-phrase', 'font-search', 'text-color-hex', 'highlight-color-hex'].concat(appearanceIds).forEach(id => { element(id).disabled = busy; });
   element('apply-style').disabled = busy || !parentReady;
   element('generate').disabled = busy || !loaded;
   element('cancel').disabled = !generating;
@@ -79,9 +116,10 @@ function drawPreview() {
   ctx.fillStyle = '#151515'; ctx.fillRect(0, 0, 1920, 1080);
   const caption = SubtitleAppearance.captionAt(previewClips, previewClips[0].startFrame + Number(element('preview-time').value));
   if (!caption) return;
-  const fonts = { 'Heebo-SemiBold': ['Heebo', 600], ArialMT: ['Arial', 400], 'Arial-BoldMT': ['Arial', 700], TimesNewRomanPSMT: ['Times New Roman', 400] };
-  const font = fonts[style.font] || [style.font, 400];
-  ctx.font = font[1] + ' ' + style.size + 'px "' + font[0].replace(/["\\]/g, '') + '", sans-serif';
+  const font = fontCatalog.find(face => face.postscript === style.font) || { family: style.font, style: 'Regular' };
+  const face = font.style || 'Regular';
+  const weight = /black|heavy/i.test(face) ? 900 : /extra.?bold/i.test(face) ? 800 : /semi.?bold|demi/i.test(face) ? 600 : /bold/i.test(face) ? 700 : /medium/i.test(face) ? 500 : /light/i.test(face) ? 300 : 400;
+  ctx.font = (/italic|oblique/i.test(face) ? 'italic ' : '') + weight + ' ' + style.size + 'px "' + (font.family || style.font).replace(/["\\]/g, '') + '", sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   const x = style.x * 19.2, y = style.y * 10.8, text = SubtitleAppearance.splitHighlight(caption.text);
   ctx.fillStyle = style.textColor; ctx.fillText(text.prefix, x, y);
@@ -183,10 +221,39 @@ element('update-phrase').addEventListener('click', () => {
   return editSelected('YTSubtitle.updatePhrase(' + argument({ ...phraseSnapshot, text: element('phrase-text').value }) + ')');
 });
 
-appearanceIds.forEach(id => element(id).addEventListener('input', () => {
+function updateAppearance() {
   try { appearance(); drawPreview(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
   catch (error) { stopPreview(); element('status').textContent = error.message; }
-}));
+}
+appearanceIds.filter(id => id !== 'text-color' && id !== 'highlight-color').forEach(id => {
+  element(id).addEventListener('input', updateAppearance);
+  element(id).addEventListener('change', updateAppearance);
+});
+['text-color', 'highlight-color'].forEach(id => {
+  const picker = element(id), hex = element(id + '-hex');
+  function fromPicker() { hex.value = picker.value; hex.setAttribute('aria-invalid', 'false'); updateAppearance(); }
+  function fromHex() {
+    const valid = /^#[0-9a-f]{6}$/i.test(hex.value.trim());
+    hex.setAttribute('aria-invalid', String(!valid));
+    if (valid) picker.value = hex.value.trim().toLowerCase();
+    updateAppearance();
+  }
+  picker.addEventListener('input', fromPicker); picker.addEventListener('change', fromPicker);
+  hex.addEventListener('input', fromHex); hex.addEventListener('change', fromHex);
+});
+tabIds.forEach((id, index) => {
+  element('tab-' + id).addEventListener('click', () => showTab(id));
+  element('tab-' + id).addEventListener('keydown', event => {
+    let next;
+    if (event.key === 'ArrowRight') next = (index + 1) % tabIds.length;
+    else if (event.key === 'ArrowLeft') next = (index + tabIds.length - 1) % tabIds.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = tabIds.length - 1;
+    else return;
+    event.preventDefault(); showTab(tabIds[next], true);
+  });
+});
+element('font-search').addEventListener('input', renderFonts);
 element('preview-phrase').addEventListener('change', choosePreviewPhrase);
 element('preview-time').addEventListener('input', () => { stopPreview(); drawPreview(); });
 element('preview-play').addEventListener('click', () => {
@@ -197,5 +264,7 @@ element('preview-play').addEventListener('click', () => {
   element('preview-play').setAttribute('aria-pressed', 'true');
   animatePreview();
 });
+renderFonts();
 preview();
+showTab('generate');
 controls();

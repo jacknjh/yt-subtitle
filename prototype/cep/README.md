@@ -8,6 +8,10 @@ Save and restart Premiere to refresh the menu name under **Window > Extensions >
 
 The preview is approximate and supports font, size, colors, position and word reveal settings. Generation imports the template once and reuses independently editable instances; one initial native import dialog may still appear. The progress bar reports completed/total and elapsed time. To match existing graphics, set the graphic under the playhead as parent and sync the current selection to its latest style. This is an explicit sync rather than a continuous relationship.
 
+The panel is organized into Generate, Style, Edit and Help tabs. Generate/Stop, progress and status remain visible below the scrolling tab content. Arrow keys, Home and End navigate the tabs. Style offers a searchable native font dropdown and separate color swatches/hex inputs; only a swatch opens a color picker.
+
+When Node is available, the installer reads font names from standard Windows system/user font folders and builds a local font catalog. It copies no font files and does not enable Node inside the panel. If scanning is unavailable, standard font choices remain. Rerun the installer after adding fonts. Adobe-private fonts and named variable-font instances may not all appear.
+
 Transcript reading currently uses the separate [UXP panel](../README.md). Automatic transcript transfer is still missing. The former three-word test remains available as a host diagnostic, but the panel now exposes the real generator.
 
 The loopback-only development debugger uses port 9227. The panel has no Node integration or network access.

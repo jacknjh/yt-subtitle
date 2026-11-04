@@ -2,63 +2,132 @@
 <html lang="en"><head><meta charset="utf-8"><title>Subtitle Generator</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
 <style>
-:root { color-scheme: dark; }
-body { margin: 16px; background: #292929; color: #f5f5f5; font: 13px/1.5 sans-serif; }
-h1 { margin: 0 0 12px; font-size: 18px; } h2 { font-size: 15px; margin: 22px 0 8px; }
+:root { color-scheme: dark; --bg: #292929; --field: #1e1e1e; --line: #666; --text: #f5f5f5; --muted: #c5c5c5; --accent: #9ccfff; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.45 'Segoe UI', sans-serif; }
+[hidden] { display: none !important; }
+header { padding: 12px 16px 8px; flex: none; }
+h1 { margin: 0; font-size: 16px; font-weight: 600; }
+h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+p { margin: 8px 0 16px; overflow-wrap: anywhere; }
 button, input, select, textarea { font: inherit; }
-button { padding: 7px 10px; margin: 0 6px 8px 0; background: #424242; color: #fff; border: 1px solid #888; border-radius: 4px; cursor: pointer; }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #9ccfff; outline-offset: 2px; }
-button:disabled { cursor: default; opacity: .55; }
-input, select, textarea { box-sizing: border-box; background: #1e1e1e; color: #f5f5f5; border: 1px solid #888; padding: 5px; max-width: 100%; }
-label { display: block; margin: 8px 0; } label > input:not([type=checkbox]), label > select { display: block; width: 100%; margin-top: 3px; }
-input[type=color] { height: 33px; padding: 2px; } input[type=range] { width: 100%; padding: 0; }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-.muted { color: #c5c5c5; font-size: 12px; } .stage { display: block; width: 360px; max-width: 100%; height: auto; margin: 0 auto; background: #151515; border: 1px solid #555; box-sizing: border-box; }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 90px; overflow: auto; }
-progress { width: 100%; height: 12px; accent-color: #9ccfff; } progress[hidden] { display: none; }
-textarea { width: 100%; } details { margin-top: 20px; color: #ddd; } summary { cursor: pointer; }
-@media (max-width: 310px) { .fields { grid-template-columns: 1fr; } }
+button { padding: 7px 12px; background: #424242; color: var(--text); border: 1px solid #888; border-radius: 4px; cursor: pointer; }
+button:hover:not(:disabled) { background: #505050; } button:active:not(:disabled) { background: #383838; }
+button:disabled { cursor: default; opacity: .5; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [role=tabpanel]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav { display: flex; border-bottom: 1px solid var(--line); padding: 0 12px; flex: none; }
+nav button { flex: 1; min-width: 0; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); }
+nav button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); background: #333; }
+nav button:focus-visible { outline-offset: -2px; }
+main { flex: 1; min-height: 0; overflow: auto; padding: 16px; scrollbar-gutter: stable; }
+input, select, textarea { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; max-width: 100%; min-width: 0; }
+input::placeholder { color: var(--muted); opacity: 1; }
+input:disabled, select:disabled, textarea:disabled { opacity: .6; }
+input[aria-invalid=true] { border-color: #f4a28d; }
+label, .field-title { display: block; margin: 0 0 5px; }
+.field { min-width: 0; margin-bottom: 12px; }
+.field > input:not([type=checkbox]), .field > select { width: 100%; }
+.fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+.check { display: flex; align-items: center; gap: 8px; min-height: 32px; margin-top: 22px; }
+.check input { margin: 0; }
+.muted { color: var(--muted); font-size: 12px; }
+.section { margin-top: 24px; }
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.stage { display: block; width: 280px; max-width: 100%; height: auto; margin: 0 auto 12px; background: #151515; border: 1px solid #555; }
+.preview-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.preview-transport { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.preview-transport button { flex: none; }
+.preview-transport input { flex: 1; min-width: 0; padding: 0; }
+.color-row { display: flex; align-items: center; gap: 8px; }
+.color-row input[type=color] { flex: none; width: 40px; height: 32px; padding: 3px; cursor: pointer; }
+.color-row input[type=text] { flex: 1; width: 0; font-family: Consolas, monospace; }
+.color-row input[type=color]:disabled { cursor: default; }
+#font-status { margin: 4px 0 16px; }
+pre { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; color: var(--muted); }
+details { margin-top: 16px; } summary { cursor: pointer; }
+textarea { width: 100%; min-height: 88px; resize: vertical; }
+footer { flex: none; padding: 12px 16px; border-top: 1px solid #555; background: #252525; }
+.generate-row { display: flex; gap: 8px; }
+#generate { flex: 1; background: var(--accent); color: #12202e; border-color: var(--accent); font-weight: 600; }
+#generate:hover:not(:disabled) { background: #b9dfff; }
+#cancel { min-width: 64px; }
+progress { display: block; width: 100%; height: 10px; margin-top: 10px; accent-color: var(--accent); }
+#progress-label { margin: 6px 0 0; } #progress-label:empty { display: none; }
+#status { margin: 8px 0 0; max-height: 3.8em; overflow: auto; font-size: 12px; color: var(--muted); }
+dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
+@media (min-width: 620px) { .style-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; } }
+@media (max-width: 340px) { .fields { grid-template-columns: minmax(0, 1fr); } .check { margin-top: 0; } }
 </style></head><body>
-<h1>Subtitle Generator</h1>
+<header><h1>Subtitle Generator</h1></header>
+<nav role="tablist" aria-label="Subtitle workflow">
+<button id="tab-generate" role="tab" aria-controls="panel-generate" aria-selected="true">Generate</button>
+<button id="tab-style" role="tab" aria-controls="panel-style" aria-selected="false" tabindex="-1">Style</button>
+<button id="tab-edit" role="tab" aria-controls="panel-edit" aria-selected="false" tabindex="-1">Edit</button>
+<button id="tab-help" role="tab" aria-controls="panel-help" aria-selected="false" tabindex="-1">Help</button>
+</nav>
+<main id="tab-content">
+<section id="panel-generate" role="tabpanel" aria-labelledby="tab-generate" tabindex="0">
+<h2>Source transcript</h2>
+<p class="muted">Open your source sequence, then load its transcript JSON. Words and timings come from the transcript.</p>
 <button id="load">Load transcript JSON</button>
-<p id="summary">Load the active sequence's transcript JSON. Captions are not required.</p>
-<div class="fields"><label>Characters per phrase <input id="characters" type="number" min="1" max="200" value="24"></label>
-<label style="align-self:center"><input id="single-word" type="checkbox"> One word at a time</label></div>
-<h2>Preview</h2>
-<p class="muted">Approximate preview. Premiere is the final reference for fonts, layout and rendering.</p>
-<canvas id="subtitle-preview" class="stage" width="960" height="540" aria-label="Approximate subtitle preview">Subtitle preview. Choose a phrase and adjust the appearance below.</canvas>
-<label>Preview phrase <select id="preview-phrase"></select></label>
-<button id="preview-play" aria-pressed="false">Play preview</button>
-<label>Preview timing <input id="preview-time" type="range" min="0" max="60" value="0" step="1"></label>
+<p id="summary">No transcript loaded. Captions and SRT are not required.</p>
+<h2 class="section">Phrase grouping</h2>
+<div class="fields"><div class="field"><label for="characters">Characters per phrase</label><input id="characters" type="number" min="1" max="200" value="24"></div>
+<label class="check"><input id="single-word" type="checkbox"> One word at a time</label></div>
+<p class="muted">Words stay whole. Sentence endings and long pauses can start a new phrase earlier.</p>
+<details><summary>First phrases</summary><pre id="preview" aria-label="First five phrases"></pre></details>
+</section>
+<section id="panel-style" role="tabpanel" aria-labelledby="tab-style" tabindex="0" hidden>
+<div class="style-layout"><div>
+<div class="preview-heading"><h2>Preview</h2><span class="muted">Approximate</span></div>
+<canvas id="subtitle-preview" class="stage" width="960" height="540" aria-label="Approximate subtitle preview">Choose a phrase and adjust its appearance.</canvas>
+<div class="field"><label for="preview-phrase">Preview phrase</label><select id="preview-phrase"></select></div>
+<div class="preview-transport"><button id="preview-play" aria-pressed="false">Play preview</button><input id="preview-time" type="range" min="0" max="60" value="0" step="1" aria-label="Preview timing" title="Preview timing"></div>
+<p class="muted">Premiere is the final reference for font spacing and rendering. Keep phrases short to fit one line.</p>
+</div><div>
+<h2>Appearance</h2>
+<div class="field"><label for="font-search">Search fonts</label><input id="font-search" type="search" placeholder="Family or font face" autocomplete="off"></div>
+<div class="field"><label for="font">Font face</label><select id="font"><option value="Heebo-SemiBold">Heebo SemiBold</option><option value="ArialMT">Arial</option><option value="Arial-BoldMT">Arial Bold</option><option value="TimesNewRomanPSMT">Times New Roman</option></select></div>
+<p id="font-status" class="muted" aria-live="polite"></p>
 <div class="fields">
-<label>Font <input id="font" list="fonts" value="Heebo-SemiBold" maxlength="100"></label>
-<datalist id="fonts"><option value="Heebo-SemiBold">Heebo SemiBold</option><option value="ArialMT">Arial</option><option value="Arial-BoldMT">Arial Bold</option><option value="TimesNewRomanPSMT">Times New Roman</option></datalist>
-<label>Font size <input id="font-size" type="number" min="8" max="240" value="85"></label>
-<label>Text color <input id="text-color" type="color" value="#ebebeb"></label>
-<label>Highlight color <input id="highlight-color" type="color" value="#fffe00"></label>
-<label>Horizontal position (%) <input id="position-x" type="number" min="0" max="100" value="15"></label>
-<label>Vertical position (%) <input id="position-y" type="number" min="0" max="100" value="80"></label>
+<div class="field"><label for="font-size">Font size</label><input id="font-size" type="number" min="8" max="240" value="85"></div>
+<div class="field"><label for="animation">Word animation</label><select id="animation"><option value="reveal-highlight">Reveal + highlight</option><option value="reveal">Word reveal</option></select></div>
+<div class="field"><span class="field-title" id="text-color-label">Text color</span><div class="color-row"><input id="text-color" type="color" value="#ebebeb" aria-labelledby="text-color-label" title="Choose text color"><input id="text-color-hex" type="text" value="#ebebeb" maxlength="7" spellcheck="false" aria-label="Text color hex value"></div></div>
+<div class="field"><span class="field-title" id="highlight-color-label">Highlight color</span><div class="color-row"><input id="highlight-color" type="color" value="#fffe00" aria-labelledby="highlight-color-label" title="Choose highlight color"><input id="highlight-color-hex" type="text" value="#fffe00" maxlength="7" spellcheck="false" aria-label="Highlight color hex value"></div></div>
+<div class="field"><label for="position-x">Horizontal (%)</label><input id="position-x" type="number" min="0" max="100" value="15"></div>
+<div class="field"><label for="position-y">Vertical (%)</label><input id="position-y" type="number" min="0" max="100" value="80"></div>
 </div>
-<label>Word animation <select id="animation"><option value="reveal-highlight">Word reveal + highlight</option><option value="reveal">Word reveal</option></select></label>
-<p class="muted">Choose an installed font. Keep phrases short to fit one line. Appearance changes apply to newly generated graphics.</p>
-<pre id="preview" aria-label="First five phrases"></pre>
-<button id="generate" disabled>Generate subtitles</button><button id="cancel" disabled>Stop</button>
+<p class="muted">These settings apply to newly generated graphics. Use the Edit tab to match existing graphics.</p>
+</div></div>
+</section>
+<section id="panel-edit" role="tabpanel" aria-labelledby="tab-edit" tabindex="0" hidden>
+<h2>Match a parent graphic</h2>
+<p class="muted">Place the playhead over a generated graphic and set it as parent. Select the graphics you want to match, then sync.</p>
+<div class="button-row"><button id="capture-style">Set parent from playhead</button><button id="apply-style">Sync selected to parent</button></div>
+<p id="parent-status" class="muted">No parent set. Sync reads the parent's latest style and preserves destination text and timing.</p>
+<h2 class="section">Correct a phrase</h2>
+<button id="read-phrase">Read selected phrase</button>
+<div class="field" style="margin-top:12px"><label for="phrase-text">Phrase text</label><textarea id="phrase-text" rows="3"></textarea></div>
+<button id="update-phrase" disabled>Update phrase text</button>
+</section>
+<section id="panel-help" role="tabpanel" aria-labelledby="tab-help" tabindex="0" hidden>
+<h2>Using the generator</h2>
+<dl>
+<dt>Load transcript JSON</dt><dd>Reads words and their timings for the active source sequence. First read and save its JSON using the UXP transcript panel.</dd>
+<dt>Style and preview</dt><dd>Choose a phrase, play or scrub its timing, then adjust appearance. The preview is approximate and does not modify timeline graphics.</dd>
+<dt>Fonts and colors</dt><dd>Search local font faces, then choose one from the dropdown. Click a color swatch to open its picker, or type a six-digit hex color. New fonts appear after rerunning the panel installer.</dd>
+<dt>Generate subtitles</dt><dd>Creates a duplicate sequence with editable word graphics on an empty top video track. Your source sequence is preserved.</dd>
+<dt>Stop</dt><dd>Finishes the current batch and keeps completed graphics. The progress bar shows completed graphics and elapsed time.</dd>
+<dt>Set parent / Sync selected</dt><dd>Remembers the generated graphic under the playhead, then copies its latest appearance to the selected destinations. Press Sync again after changing the parent.</dd>
+<dt>Read / Update phrase</dt><dd>Loads the phrase associated with a selected generated graphic. Update rewrites all its word graphics while retaining their timeline positions. Duplicate or delete word graphics first when changing the word count.</dd>
+</dl>
+</section>
+</main>
+<footer>
+<div class="generate-row"><button id="generate" disabled>Generate subtitles</button><button id="cancel" disabled>Stop</button></div>
 <progress id="generation-progress" max="1" value="0" hidden aria-label="Subtitle generation progress"></progress>
 <p id="progress-label" class="muted"></p>
-<p id="status" role="status" aria-live="polite">Ready. Generation adds editable graphics to a duplicate of the source sequence.</p>
-<h2>Match a parent graphic</h2>
-<p class="muted">Place the playhead over a generated graphic, set it as parent, then select the graphics you want to match. Text and timing are preserved.</p>
-<button id="capture-style">Set parent from playhead</button><button id="apply-style">Sync selected to parent</button>
-<p id="parent-status" class="muted">No parent set. Sync rereads the parent's latest style each time.</p>
-<h2>Correct a phrase</h2>
-<button id="read-phrase">Read selected phrase</button>
-<label for="phrase-text">Phrase text</label><textarea id="phrase-text" rows="3"></textarea>
-<button id="update-phrase" disabled>Update phrase text</button>
-<details><summary>What do these buttons do?</summary>
-<p>Load transcript JSON reads the words and timings for the active source sequence. Play preview and the timing slider preview the selected phrase without creating clips.</p>
-<p>Generate subtitles creates a separate sequence with editable word graphics. Stop keeps the completed graphics after the current batch.</p>
-<p>Set parent from playhead remembers that graphic. Sync selected to parent copies its current appearance to selected graphics, preserving their words and timing. This is an explicit sync, not a continuous link.</p>
-<p>Read selected phrase loads the full phrase containing your selected generated graphic. Update phrase text corrects all its word graphics while retaining their current timeline positions.</p>
-</details>
-<script src="config.js"></script><script src="planner.js"></script><script src="appearance.js"></script><script src="main.js"></script>
+<p id="status" role="status" aria-live="polite">Load a transcript to begin. Choose appearance in the Style tab.</p>
+</footer>
+<script src="config.js"></script><script src="planner.js"></script><script src="appearance.js"></script><script src="font-data.js"></script><script src="main.js"></script>
 </body></html>
