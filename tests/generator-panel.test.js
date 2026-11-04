@@ -26,6 +26,44 @@ function panel(respond) {
   return { elements, calls, context, data, source, key(event) { for (const listener of listeners.keydown || []) listener(event); }, accept() { context.acceptTranscript(JSON.stringify(data), source); } };
 }
 
+test('empty position is rejected inline and Generate focuses the invalid style field', async () => {
+  const p = panel(() => ({ ok: true }));
+  p.accept();
+  p.elements['position-x'].value = '';
+  p.elements['position-x'].events.input();
+  assert.equal(p.elements['position-x']['aria-invalid'], 'true');
+  assert.equal(p.elements['position-x-error'].hidden, false);
+  await p.elements.generate.events.click();
+  assert.equal(p.calls.length, 0);
+  assert.equal(p.elements['panel-style'].hidden, false);
+  assert.equal(p.elements['position-x'].focused, true);
+  p.elements['position-x'].value = '50';
+  p.elements['position-x'].events.input();
+  assert.equal(p.elements['position-x']['aria-invalid'], 'false');
+  assert.equal(p.elements['position-x-error'].hidden, true);
+});
+
+test('color validation shows an actionable inline error and clears after correction', () => {
+  const p = panel(() => ({ ok: true }));
+  p.elements['text-color-hex'].value = '#bad';
+  p.elements['text-color-hex'].events.input();
+  assert.match(p.elements['text-color-hex-error'].textContent, /#[0-9a-f]{6}/i);
+  assert.equal(p.elements['text-color-hex-error'].hidden, false);
+  p.elements['text-color-hex'].value = '#abcdef';
+  p.elements['text-color-hex'].events.input();
+  assert.equal(p.elements['text-color-hex-error'].hidden, true);
+  assert.equal(p.elements['text-color'].value, '#abcdef');
+});
+
+test('tab arrows follow the visual direction in RTL', () => {
+  const p = panel(() => ({ ok: true }));
+  p.context.document.documentElement = { dir: 'rtl' };
+  p.elements['tab-generate'].events.keydown({ key: 'ArrowLeft', preventDefault() {} });
+  assert.equal(p.elements['tab-style']['aria-selected'], 'true');
+  p.elements['tab-style'].events.keydown({ key: 'ArrowRight', preventDefault() {} });
+  assert.equal(p.elements['tab-generate']['aria-selected'], 'true');
+});
+
 test('generates in small batches, reports completion and restores controls', async () => {
   let inserted = 0;
   const p = panel(expression => expression.includes('YTSubtitle.beginGeneration(') ? { ok: true, sequenceId: 'copy', sequenceName: 'Copy' } : { ok: true, total: inserted += inserted ? 2 : 5 });
@@ -155,10 +193,10 @@ test('settings undo groups typed changes and redo reapplies the preview value', 
   const field = p.elements['font-size'];
   for (const value of ['9', '95', '100']) { field.value = value; field.events.input(); }
   field.events.change();
-  p.elements['undo-settings'].events.click();
+  p.key({ key: 'z', ctrlKey: true, preventDefault() {} });
   assert.equal(Number(field.value), 85);
-  assert.equal(p.elements['redo-settings'].disabled, false);
-  p.elements['redo-settings'].events.click();
+  assert.equal(vm.runInContext('settingsHistory.canRedo()', p.context), true);
+  p.key({ key: 'z', ctrlKey: true, shiftKey: true, preventDefault() {} });
   assert.equal(Number(field.value), 100);
 });
 
@@ -189,11 +227,11 @@ test('each sequence retains its own settings history after switching timelines',
   await activate(a);
   p.elements['font-size'].value = '95'; p.elements['font-size'].events.change();
   await activate(b);
-  assert.equal(p.elements['undo-settings'].disabled, true);
+  assert.equal(vm.runInContext('settingsHistory.canUndo()', p.context), false);
   p.elements['font-size'].value = '77'; p.elements['font-size'].events.change();
   await activate(a);
   assert.equal(Number(p.elements['font-size'].value), 95);
-  p.elements['undo-settings'].events.click();
+  p.key({ key: 'z', ctrlKey: true, preventDefault() {} });
   assert.equal(Number(p.elements['font-size'].value), 85);
   await activate(b);
   assert.equal(Number(p.elements['font-size'].value), 77);
@@ -298,7 +336,7 @@ test('Reset style is undoable and preserves phrase grouping', () => {
   assert.equal(p.elements.animation.value, 'reveal');
   assert.equal(p.elements.characters.value, 32);
   assert.equal(Number(p.elements['max-lines'].value), 2);
-  p.elements['undo-settings'].events.click();
+  p.key({ key: 'z', ctrlKey: true, preventDefault() {} });
   assert.equal(p.elements.font.value, 'ArialMT');
   assert.equal(p.elements.alignment.value, 'right');
 });
@@ -309,9 +347,9 @@ test('Default and line count update preview geometry, support undo and travel wi
   p.elements['default-layout'].checked = true; p.elements['default-layout'].events.change();
   p.elements['max-lines'].value = '2'; p.elements['max-lines'].events.change();
   assert.match(p.elements.preview.textContent, /\r/);
-  p.elements['undo-settings'].events.click();
+  p.key({ key: 'z', ctrlKey: true, preventDefault() {} });
   assert.equal(Number(p.elements['max-lines'].value), 1);
-  p.elements['redo-settings'].events.click();
+  p.key({ key: 'z', ctrlKey: true, shiftKey: true, preventDefault() {} });
   assert.equal(Number(p.elements['max-lines'].value), 2);
   await p.elements.generate.events.click();
   assert.match(p.calls[0], /"centeredReveal":true,"lines":2/);

@@ -37,6 +37,15 @@ test('older saved styles retain their previous left alignment', () => {
   delete a.lines; delete a.centeredReveal;
   assert.equal(validate(a).lines, 1); assert.equal(validate(a).centeredReveal, false);
 });
+
+test('retired shadow settings are ignored without changing saved typography', () => {
+  const saved = { ...defaults(), font: 'ArialMT', size: 92, shadow: true };
+  const normalized = validate(saved);
+  assert.equal(normalized.font, 'ArialMT');
+  assert.equal(normalized.size, 92);
+  assert.equal(Object.hasOwn(normalized, 'shadow'), false);
+});
+
 test('preview uses the same word intervals as timeline output and blanks gaps', () => {
   const clips = [{ startFrame: 5, endFrame: 10, text: 'Hello' }, { startFrame: 12, endFrame: 20, text: 'Hello guys' }];
   assert.equal(captionAt(clips, 4), null);

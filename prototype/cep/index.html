@@ -2,27 +2,25 @@
 <html lang="en"><head><meta charset="utf-8"><title>Subtitle Generator</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
 <style>
-:root { color-scheme: dark; --bg: #292929; --field: #1e1e1e; --line: #666; --text: #f5f5f5; --muted: #c5c5c5; --accent: #9ccfff; }
+:root { color-scheme: dark; --bg: #292929; --field: #1e1e1e; --line: #8a8a8a; --divider: #4c4c4c; --raised: #333; --button: #3c3c3c; --hover: #4a4a4a; --text: #f5f5f5; --muted: #c5c5c5; --accent: #9ccfff; --error: #ffb3a0; }
 * { box-sizing: border-box; }
-body { margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.45 'Segoe UI', sans-serif; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: auto; background: var(--bg); color: var(--text); font: .8125rem/1.5 'Segoe UI', sans-serif; }
 [hidden] { display: none !important; }
-header { padding: 12px 16px 8px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-header h1 { min-width: 0; font-size: 15px; }
-.history-actions { display: flex; gap: 4px; }
-.history-actions button { padding: 4px 7px; font-size: 12px; }
 h1 { margin: 0; font-size: 16px; font-weight: 600; }
-h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+h2 { margin: 0 0 8px; font-size: .875rem; font-weight: 600; }
 p { margin: 8px 0 16px; overflow-wrap: anywhere; }
 button, input, select, textarea { font: inherit; }
-button { padding: 7px 12px; background: #424242; color: var(--text); border: 1px solid #888; border-radius: 4px; cursor: pointer; }
-button:hover:not(:disabled) { background: #505050; } button:active:not(:disabled) { background: #383838; }
+button { min-height: 32px; padding: 6px 12px; background: var(--button); color: var(--text); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; overflow-wrap: anywhere; }
+button:active:not(:disabled) { background: var(--field); }
 button:disabled { cursor: default; opacity: .5; }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [role=tabpanel]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-nav { display: flex; border-bottom: 1px solid var(--line); padding: 0 12px; flex: none; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav { border-bottom: 1px solid var(--divider); padding: 0 12px; flex: none; }
+.workflow-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.6em, 1fr)); }
 nav button { flex: 1; min-width: 0; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); }
-nav button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); background: #333; }
+nav button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); background: var(--raised); }
 nav button:focus-visible { outline-offset: -2px; }
-main { flex: 1; min-height: 0; overflow: auto; padding: 16px; scrollbar-gutter: stable; }
+main { flex: 1; min-height: 8rem; overflow: auto; padding: 16px; scrollbar-gutter: stable; }
+main, .style-settings, .style-preview, #status { overscroll-behavior: contain; }
 main[data-tab=style] { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 #panel-style { height: 100%; }
 .style-layout { height: 100%; min-height: 0; display: flex; flex-direction: column; }
@@ -31,31 +29,37 @@ main[data-tab=style] { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 .style-preview .stage { width: auto; max-width: 100%; height: clamp(64px, 18vh, 130px); margin-bottom: 8px; }
 .style-preview .field { margin-bottom: 8px; }
 .style-preview .preview-transport { margin: 0; }
-.style-preview .preview-transport button { padding: 4px 8px; font-size: 12px; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-input, select, textarea { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; max-width: 100%; min-width: 0; }
+.style-preview .preview-transport button { padding: 4px 8px; font-size: .75rem; }
+.sr-only, .skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.skip-link:focus { position: absolute; inset-block-start: 8px; inset-inline-start: 16px; z-index: 1; padding: 8px 12px; background: var(--field); color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
+input, select, textarea { min-height: 32px; background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; max-width: 100%; min-width: 0; }
+input[type=checkbox] { min-height: 0; accent-color: var(--accent); }
+input[type=number], #summary, #progress-label { font-variant-numeric: tabular-nums; }
 input::placeholder { color: var(--muted); opacity: 1; }
 input:disabled, select:disabled, textarea:disabled { opacity: .6; }
-input[aria-invalid=true] { border-color: #f4a28d; }
+input[aria-invalid=true] { border-color: var(--error); }
+.field-error { color: var(--error); font-size: .75rem; margin: 6px 0 0; }
 label, .field-title { display: block; margin: 0 0 5px; }
 .field { min-width: 0; margin-bottom: 12px; }
 .field > input:not([type=checkbox]), .field > select { width: 100%; }
 .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
 .check { display: flex; align-items: center; gap: 8px; min-height: 32px; margin-top: 22px; }
 .check input { margin: 0; }
-.muted { color: var(--muted); font-size: 12px; }
-.hint { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.muted { color: var(--muted); font-size: .75rem; }
+.hint { margin: 4px 0 0; color: var(--muted); font-size: .75rem; }
 .control-section + .control-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #4c4c4c; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; }
 .section-heading h2 { margin: 0; }
-.compact { padding: 4px 10px; font-size: 12px; }
-.timeline-name { margin: 0 0 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.compact { padding: 4px 10px; font-size: .75rem; }
+.timeline-details { margin: 0; }
+.timeline-details summary { color: var(--text); }
+.timeline-name { vertical-align: top; display: inline-block; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-details[open] .timeline-name { white-space: normal; overflow-wrap: anywhere; }
 #transcript-source { margin: 4px 0; } #summary { margin: 8px 0; font-weight: 600; }
 .grouping-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 16px; }
 .grouping-row .field { flex: 1 1 104px; max-width: 160px; margin: 0; }
 .grouping-row .check { margin: 0; min-height: 34px; }
 .scrub-value { cursor: ew-resize; touch-action: none; user-select: none; font-variant-numeric: tabular-nums; }
-.scrub-value:hover:not(:disabled) { border-color: var(--accent); }
 .scrub-value:focus { cursor: text; user-select: text; }
 .scrub-value:disabled { cursor: default; }
 .scrub-value::-webkit-inner-spin-button, .scrub-value::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -72,39 +76,53 @@ body.scrubbing, body.scrubbing * { cursor: ew-resize !important; user-select: no
 .color-row input[type=color]:disabled { cursor: default; }
 #font-status { margin: 4px 0 12px; }
 pre { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; color: var(--muted); }
-details { margin-top: 12px; } summary { cursor: pointer; color: var(--muted); } summary:hover { color: var(--text); }
+details { margin-top: 12px; } summary { min-height: 32px; padding-block: 6px; cursor: pointer; color: var(--muted); overflow-wrap: anywhere; }
+.style-section { margin: 0; }
+.style-section + .style-section { border-top: 1px solid var(--divider); margin-top: 12px; padding-top: 12px; }
+.style-section > summary { color: var(--text); }
+.style-section > summary h2 { display: inline; margin: 0; }
+.style-section[open] > summary { margin-bottom: 12px; }
+.style-actions { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.help-topic { border-bottom: 1px solid var(--divider); margin: 0; padding-block: 4px; }
+.help-topic > summary { color: var(--text); font-weight: 600; }
+.help-topic dl { margin-block: 8px; }
+.help-topic ol { padding-inline-start: 24px; color: var(--muted); }
+.help-topic li + li { margin-top: 8px; }
 textarea { width: 100%; min-height: 88px; resize: vertical; }
 footer { flex: none; padding: 12px 16px; border-top: 1px solid #555; background: #252525; }
 .generate-row { display: flex; flex-wrap: wrap; gap: 8px; }
 #generate { flex: 1; background: var(--accent); color: #12202e; border-color: var(--accent); font-weight: 600; }
-#generate:hover:not(:disabled) { background: #b9dfff; }
 #cancel { min-width: 64px; }
 progress { display: block; width: 100%; height: 10px; margin-top: 10px; accent-color: var(--accent); }
 #progress-label { margin: 6px 0 0; } #progress-label:empty { display: none; }
-#status { margin: 8px 0 0; max-height: 3.8em; overflow: auto; font-size: 12px; color: var(--muted); }
+#status { margin: 8px 0 0; max-height: 3.8em; overflow: auto; font-size: .75rem; color: var(--muted); }
 dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
-@media (min-width: 620px) { .style-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .style-preview { min-width: 0; max-height: 100%; border-bottom: 0; border-right: 1px solid #4c4c4c; } .style-preview .stage { width: 280px; height: auto; } .style-settings { min-width: 0; } }
+@media (hover: hover) { button:hover:not(:disabled) { background: var(--hover); } #generate:hover:not(:disabled) { background: #b9dfff; } summary:hover { color: var(--text); } .scrub-value:hover:not(:disabled) { border-color: var(--accent); } }
+@media (prefers-reduced-motion: no-preference) { button { transition: background-color 150ms ease-out; } .generate-row button, .button-row button { transition: background-color 150ms ease-out, transform 150ms ease-out; } .generate-row button:active:not(:disabled), .button-row button:active:not(:disabled) { transform: scale(.96); } }
+@media (forced-colors: active) { button, input, select, textarea { border-color: ButtonText; } nav button { border-color: transparent; } nav button[aria-selected=true] { border-bottom-color: Highlight; } :focus-visible { outline-color: Highlight; } input[aria-invalid=true] { border-style: dashed; } }
+@media (min-width: 620px) { .style-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .style-preview { min-width: 0; max-height: 100%; border-bottom: 0; border-inline-end: 1px solid var(--divider); } .style-preview .stage { width: 280px; height: auto; } .style-settings { min-width: 0; } }
 @media (max-width: 340px) { .fields { grid-template-columns: minmax(0, 1fr); } .check { margin-top: 0; } }
 </style></head><body>
-<header><h1>Subtitle Generator</h1><div class="history-actions" role="group" aria-label="Panel settings history"><button id="undo-settings" disabled title="Undo panel settings (Ctrl+Z)">Undo</button><button id="redo-settings" disabled title="Redo panel settings (Ctrl+Shift+Z or Ctrl+Y)">Redo</button></div></header>
-<nav role="tablist" aria-label="Subtitle workflow">
+<a class="skip-link" href="#tab-content">Skip to tab content</a>
+<nav aria-label="Subtitle workflow"><div class="workflow-tabs" role="tablist" aria-label="Subtitle workflow">
 <button id="tab-generate" role="tab" aria-controls="panel-generate" aria-selected="true">Generate</button>
 <button id="tab-style" role="tab" aria-controls="panel-style" aria-selected="false" tabindex="-1">Style</button>
 <button id="tab-edit" role="tab" aria-controls="panel-edit" aria-selected="false" tabindex="-1">Edit</button>
 <button id="tab-help" role="tab" aria-controls="panel-help" aria-selected="false" tabindex="-1">Help</button>
-</nav>
-<main id="tab-content">
+</div></nav>
+<main id="tab-content" tabindex="-1">
+<h1 class="sr-only">Subtitle Generator</h1>
 <section id="panel-generate" role="tabpanel" aria-labelledby="tab-generate" tabindex="0">
 <div class="control-section">
 <div class="section-heading"><h2>Transcript</h2><button id="refresh-transcript" class="compact" title="Refresh from Premiere" aria-label="Refresh from Premiere">Refresh</button></div>
-<p id="sequence-label" class="timeline-name">Detecting the active timeline…</p>
+<details class="timeline-details"><summary><span id="sequence-label" class="timeline-name">Detecting the active timeline…</span></summary></details>
 <p id="transcript-source" class="muted" role="status"></p>
 <p id="summary">Connecting to Premiere’s transcript reader…</p>
 <details><summary>Use a JSON file instead</summary><p class="hint">Manual override until you refresh from Premiere.</p><button id="load" class="compact">Choose transcript JSON file</button></details>
 </div>
 <div class="control-section">
 <h2>Phrase grouping</h2>
-<div class="grouping-row"><div class="field"><label for="characters">Characters per phrase</label><input id="characters" type="number" min="1" max="200" value="24"></div>
+<div class="grouping-row"><div class="field"><label for="characters">Characters per phrase</label><input id="characters" type="number" min="1" max="200" value="24" aria-describedby="characters-error"><p id="characters-error" class="field-error" hidden></p></div>
 <div class="field"><label for="max-lines">Lines per phrase</label><select id="max-lines"><option value="1">1 line</option><option value="2">Up to 2 lines</option></select></div>
 <label class="check"><input id="single-word" type="checkbox"> One word at a time</label></div>
 <p class="hint">Whole words. Sentences and pauses may split earlier.</p>
@@ -118,29 +136,31 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 <div class="field"><label for="preview-phrase" class="sr-only">Preview phrase</label><select id="preview-phrase" title="Preview phrase"></select></div>
 <div class="preview-transport"><button id="preview-play" aria-pressed="false">Play preview</button><input id="preview-time" type="range" min="0" max="60" value="0" step="1" aria-label="Preview timing" title="Preview timing"></div>
 </div><div class="style-settings" id="style-settings" role="region" aria-label="Style settings" tabindex="0">
-<div class="control-section">
-<div class="section-heading"><h2>Typography</h2><button id="reset-style" class="compact" title="Reset font, colors, position, alignment and word reveal to defaults">Reset style</button></div>
-<div class="field"><label for="font-search">Search fonts</label><input id="font-search" type="search" placeholder="Family or font face" autocomplete="off"></div>
+<div class="style-actions"><button id="reset-style" class="compact" title="Reset font, colors, position, alignment and word reveal to defaults">Reset all style</button></div>
+<details class="style-section" open><summary><h2>Typography</h2></summary>
+
+<div class="field"><label for="font-search">Search fonts</label><input id="font-search" type="search" placeholder="e.g. Times New Roman" autocomplete="off"></div>
 <div class="field"><label for="font">Font face</label><select id="font"><option value="Heebo-SemiBold">Heebo SemiBold</option><option value="ArialMT">Arial</option><option value="Arial-BoldMT">Arial Bold</option><option value="TimesNewRomanPSMT" selected>Times New Roman</option></select></div>
 <p id="font-status" class="muted" aria-live="polite"></p>
-<div class="field"><label for="font-size">Font size</label><input id="font-size" class="scrub-value" type="number" min="8" max="240" step="0.1" value="85" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
+<div class="field"><label for="font-size">Font size</label><input id="font-size" class="scrub-value" type="number" min="8" max="240" step="0.1" value="85" aria-describedby="scrub-hint font-size-error" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."><p id="font-size-error" class="field-error" hidden></p></div>
 <p id="scrub-hint" class="hint">Drag values left/right, or click to type. Shift for fine control.</p>
+</details>
+<details class="style-section"><summary><h2>Colors</h2></summary><div class="fields">
+<div class="field"><span class="field-title" id="text-color-label">Text color</span><div class="color-row"><input id="text-color" type="color" value="#ebebeb" aria-labelledby="text-color-label" title="Choose text color"><input id="text-color-hex" type="text" value="#ebebeb" maxlength="7" spellcheck="false" aria-label="Text color hex value" aria-describedby="text-color-hex-error"></div><p id="text-color-hex-error" class="field-error" hidden></p></div>
+<div class="field"><span class="field-title" id="highlight-color-label">Highlight color</span><div class="color-row"><input id="highlight-color" type="color" value="#fffe00" aria-labelledby="highlight-color-label" title="Choose highlight color"><input id="highlight-color-hex" type="text" value="#fffe00" maxlength="7" spellcheck="false" aria-label="Highlight color hex value" aria-describedby="highlight-color-hex-error"></div><p id="highlight-color-hex-error" class="field-error" hidden></p></div>
 </div>
-<div class="control-section"><h2>Colors</h2><div class="fields">
-<div class="field"><span class="field-title" id="text-color-label">Text color</span><div class="color-row"><input id="text-color" type="color" value="#ebebeb" aria-labelledby="text-color-label" title="Choose text color"><input id="text-color-hex" type="text" value="#ebebeb" maxlength="7" spellcheck="false" aria-label="Text color hex value"></div></div>
-<div class="field"><span class="field-title" id="highlight-color-label">Highlight color</span><div class="color-row"><input id="highlight-color" type="color" value="#fffe00" aria-labelledby="highlight-color-label" title="Choose highlight color"><input id="highlight-color-hex" type="text" value="#fffe00" maxlength="7" spellcheck="false" aria-label="Highlight color hex value"></div></div>
-</div></div>
-<div class="control-section"><h2>Position</h2>
+</details>
+<details class="style-section"><summary><h2>Position</h2></summary>
 <div class="field"><label for="alignment">Phrase alignment</label><select id="alignment"><option value="left">Left</option><option value="center" selected>Center</option><option value="right">Right</option></select></div>
-<label class="check" style="margin:0 0 4px"><input id="default-layout" type="checkbox"> Default</label>
-<p class="hint" style="margin-bottom:12px">Center the completed phrase. Left builds from its left edge; Right grows leftward in spoken order; Center keeps recentering.</p>
+<label class="check" style="margin:0 0 4px"><input id="default-layout" type="checkbox" aria-describedby="default-hint"> Default</label>
+<p id="default-hint" class="hint" style="margin-bottom:12px">Center the full phrase. Left builds rightward; Right builds leftward in spoken order. Center keeps recentering.</p>
 <div class="fields">
-<div class="field"><label for="position-x">Horizontal (%)</label><input id="position-x" class="scrub-value" type="number" min="0" max="100" step="0.1" value="50" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
-<div class="field"><label for="position-y">Vertical (%)</label><input id="position-y" class="scrub-value" type="number" min="0" max="100" step="0.1" value="90" aria-describedby="scrub-hint" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."></div>
-</div></div>
-<div class="control-section"><h2>Animation</h2>
+<div class="field"><label for="position-x">Horizontal (%)</label><input id="position-x" class="scrub-value" type="number" min="0" max="100" step="0.1" value="50" aria-describedby="scrub-hint position-x-error" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."><p id="position-x-error" class="field-error" hidden></p></div>
+<div class="field"><label for="position-y">Vertical (%)</label><input id="position-y" class="scrub-value" type="number" min="0" max="100" step="0.1" value="90" aria-describedby="scrub-hint position-y-error" title="Drag left or right to adjust. Click to type. Hold Shift for fine control. Escape cancels a drag."><p id="position-y-error" class="field-error" hidden></p></div>
+</div></details>
+<details class="style-section"><summary><h2>Animation</h2></summary>
 <div class="field"><label for="animation">Word animation</label><select id="animation"><option value="reveal">Word reveal</option><option value="reveal-highlight">Reveal + highlight</option></select></div>
-<p class="hint">For new graphics. Use Edit to match existing graphics.</p></div>
+<p class="hint">For new graphics. Use Edit to match existing graphics.</p></details>
 </div></div>
 </section>
 <section id="panel-edit" role="tabpanel" aria-labelledby="tab-edit" tabindex="0" hidden>
@@ -157,32 +177,30 @@ dt { font-weight: 600; } dd { margin: 4px 0 16px; color: var(--muted); }
 </div>
 </section>
 <section id="panel-help" role="tabpanel" aria-labelledby="tab-help" tabindex="0" hidden>
-<div class="control-section"><h2>Transcript</h2>
-<dl>
-<dt>Automatic transcript</dt><dd>The active project and timeline are detected automatically. A background reader fetches the current transcript. Refresh after correcting words or timings; generation also refreshes automatic transcripts before creating graphics.</dd>
-<dt>Remembered settings</dt><dd>Appearance, phrase grouping and transcript snapshots are saved separately for each project and timeline. Cached Premiere words are refreshed before generation. A saved manual JSON choice stays manual until you refresh from Premiere.</dd>
-<dt>Choose transcript JSON file</dt><dd>The Generate tab's JSON fallback opens a previously exported transcript. Use it when a native transcript is unavailable or you want to supply your own data.</dd>
-</dl></div>
-<div class="control-section"><h2>Style controls</h2><dl>
-<dt>Undo / Redo settings</dt><dd>Undo and Redo restore panel appearance and phrase grouping. Use Ctrl+Z to undo, Ctrl+Shift+Z or Ctrl+Y to redo. Each completed drag is one step. While typing, the focused field keeps its normal text undo. Histories stay separate for each timeline while this panel is open; timeline edits use Premiere's own undo history.</dd>
-<dt>Pinned preview</dt><dd>The preview stays above the scrolling controls in a narrow panel, or beside them in a wider panel. Premiere remains the final reference for spacing and rendering.</dd>
-<dt>Style and preview</dt><dd>Choose a phrase, play or scrub its timing, then adjust appearance. The preview is approximate and does not modify timeline graphics.</dd>
-<dt>Default style and alignment</dt><dd>New timelines start with Times New Roman, plain word reveal and a bottom-center anchor at 50% horizontal, 90% vertical. Left, Center and Right align the visible phrase around that horizontal position. Saved styles are retained; Reset style applies the new defaults and can be undone.</dd>
-<dt>Default toggle</dt><dd>With Default enabled, the completed phrase block is centered on the horizontal position. Left reveals from its fixed left edge, Center retains centered growing phrases, and Right grows leftward from the completed phrase's right edge in normal spoken order. The toggle starts off to retain existing behavior.</dd>
-<dt>Two lines</dt><dd>Choose Up to 2 lines in Generate. A balanced word-boundary break is chosen from the complete phrase before reveal; single words stay on one line. The character limit still applies to the whole phrase. The bottom line stays near the configured vertical position, with the other line above it.</dd>
-<dt>Fonts and colors</dt><dd>Search local font faces, then choose one from the dropdown. Click a color swatch to open its picker, or type a six-digit hex color. New fonts appear after rerunning the panel installer.</dd>
-<dt>Drag numeric values</dt><dd>Drag font size or a position value left to decrease, right to increase. Hold Shift for fine adjustments. Escape cancels the drag. Click to type; press Enter or click elsewhere when finished. Arrow keys also adjust a focused field.</dd>
-</dl></div>
-<div class="control-section"><h2>Generation</h2><dl>
-<dt>Generate subtitles</dt><dd>Adds editable word graphics directly to an empty top video track in the current sequence. No duplicate sequence is created.</dd>
-<dt>Pause / Resume</dt><dd>Pause finishes the current batch and retains progress. Switching timelines also pauses generation. Return to the original timeline and press Resume. The original appearance and word plan are kept. Resume requires unchanged subtitle clip positions; edit other tracks freely. One unfinished run is kept while this panel remains open.</dd>
-<dt>Discard run</dt><dd>Forgets the unfinished run without deleting its completed graphics. Remove those graphics before generating a new run on that timeline.</dd>
-</dl></div>
-<div class="control-section"><h2>Timeline edits</h2><dl>
-<dt>Set parent / Sync selected</dt><dd>Remembers the generated graphic under the playhead, then copies its latest appearance to the selected destinations. Press Sync again after changing the parent.</dd>
-<dt>Read / Update phrase</dt><dd>Loads the phrase associated with a selected generated graphic. Update rewrites all its word graphics while retaining their timeline positions. Duplicate or delete word graphics first when changing the word count.</dd>
-</dl>
-</div>
+<h2>Using Subtitle Generator</h2>
+<details class="help-topic" open><summary>Get started</summary>
+<ol><li>Generate a transcript in Premiere. The active timeline’s words load automatically; use Refresh after corrections.</li><li>Set the phrase length and line count in Generate. Choose appearance and preview a phrase in Style.</li><li>Click Generate subtitles. Editable word graphics are added to an empty top video track in the current sequence.</li><li>Adjust timing directly on the timeline. Use Edit to correct phrases or match selected graphics to a parent.</li></ol>
+<p class="hint">Each project and timeline remembers its own transcript snapshot and settings. Automatic transcripts refresh again before generation.</p></details>
+<details class="help-topic"><summary>Style, alignment and preview</summary><dl>
+<dt>Preview</dt><dd>Play or scrub a phrase while adjusting style. The preview stays visible as settings scroll. Premiere is the final reference for spacing and rendering.</dd>
+<dt>Alignment and Default</dt><dd>Left, Center and Right anchor the visible phrase at the horizontal position. Turn on Default to center the completed phrase: Left reveals from its fixed left edge; Right grows leftward in spoken order; Center keeps recentering.</dd>
+<dt>Two lines</dt><dd>Choose Up to 2 lines in Generate. The complete phrase determines a balanced word-boundary break before reveal. The character limit covers both lines. The bottom line uses the vertical position; the other sits above it.</dd>
+<dt>Fonts, colors and values</dt><dd>Search fonts, then choose a face. Click a swatch or type a six-digit hex color. Drag numeric values, or click to type and use arrow keys. Shift gives finer drags; Escape cancels a drag. Rerun the installer to refresh newly installed fonts.</dd>
+<dt>Reset all style</dt><dd>Restores Times New Roman, plain word reveal, centered alignment and a 50% horizontal / 90% vertical anchor. Phrase grouping stays unchanged. Saved settings are retained until you change or reset them.</dd>
+<dt>Undo and Redo</dt><dd>Restore panel style and grouping with Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y. Each drag is one step. Text fields retain normal typing undo. Each timeline keeps its own history while the panel is open. Timeline edits use Premiere’s undo.</dd>
+</dl></details>
+<details class="help-topic"><summary>Pause, resume or discard a run</summary><dl>
+<dt>Pause and Resume</dt><dd>Pause finishes the current batch. Switching timelines also pauses generation. Return to the original timeline and click Resume; its original word plan and style are kept. Keep generated subtitle positions unchanged until the run finishes. Other tracks can be edited freely.</dd>
+<dt>Discard run</dt><dd>Forgets progress and leaves completed graphics on the timeline. Remove those graphics before generating again there.</dd>
+</dl><p class="hint">One unfinished run is kept while this panel remains open. Closing the panel or Premiere loses resumable progress.</p></details>
+<details class="help-topic"><summary>Edit graphics on the timeline</summary><dl>
+<dt>Set parent and Sync selected</dt><dd>Place the playhead over a generated graphic and set it as parent. Select destination graphics, then sync. Sync reads the parent’s latest appearance while preserving destination text and timing. Click Sync again after later parent edits; it is not a continuous link. Added effects such as S_Shake, Motion, Transform and Drop Shadow are preserved on destinations but are not copied. Keyframed template style controls block Sync.</dd>
+<dt>Read and Update phrase</dt><dd>Select a generated graphic and read its phrase. Edit the text, then update to rewrite its word graphics while keeping their positions. Duplicate or delete word graphics first when changing the word count.</dd>
+</dl></details>
+<details class="help-topic"><summary>Transcript or connection problems</summary><dl>
+<dt>Refresh from Premiere</dt><dd>Check that the intended timeline is active and has a transcript. Click Refresh in Generate. If the reader cannot connect, close and reopen this panel, then retry.</dd>
+<dt>Use a JSON file instead</dt><dd>Open the JSON option in Generate and choose an exported transcript. This manual choice is remembered for the timeline until you refresh from Premiere. Captions and SRT are not required.</dd>
+</dl></details>
 </section>
 </main>
 <footer>

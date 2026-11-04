@@ -1,0 +1,9 @@
+# Plugin UI polish
+
+User-authorized scope: polish the complete Subtitle Generator panel using better-ui and its companion UI skills. Keep the Premiere-style dark theme, all four tabs, pinned preview, public control IDs and established generation/edit behavior.
+
+Confirmed issues: input borders are 2.53:1 against the panel (below 3:1), full sequence names are only accessible through a mouse tooltip, validation is remote from the edited field, Help is an unbroken long read, counters lack numeric alignment, and fixed chrome can crowd the content under text enlargement. Preserve the user's requested section dividers; improve grouping and consistency rather than introducing decorative cards or a new visual identity.
+
+Implementation: consolidate semantic surface/border/text tokens in the existing hex palette; consistent rem typography, spacing, control states, contained scrolling, forced-colors support and reduced-motion-safe feedback. Add a native sequence-name disclosure and topic disclosures in Help. Shorten repeated copy without removing operational limits. Show field-specific numeric/color errors linked to their controls and focus invalid settings on Generate. Keep panel input undo and all generation/native APIs unchanged. Correct tab arrow direction under RTL.
+
+Verification: existing regression suite plus meaningful field-validation and keyboard tests. Inspect the actual CEP renderer at 280/320/420/800 widths, short heights, 200% text enlargement, RTL and reduced motion. Check computed contrast, accessible names/roles, focus, disclosures, color-picker hit areas and drag/typing controls. Use an automated accessibility audit when available. Do not generate or change timeline graphics for this UI-only task. Record coverage, before/after findings and unverified checks in a single review report.

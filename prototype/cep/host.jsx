@@ -2,7 +2,7 @@ var YTSubtitle = (function () {
     function initialize(extensionPath) {
         // The first manifest-loaded JSX cannot reliably use $.fileName to locate its dependencies.
         if (typeof JSON === 'undefined') $.evalFile(new File(extensionPath + '/vendor/json2.js'));
-        if (typeof SubtitleAppearance === 'undefined' || SubtitleAppearance.defaults().lines === undefined) $.evalFile(new File(extensionPath + '/appearance.js'));
+        if (typeof SubtitleAppearance === 'undefined' || SubtitleAppearance.defaults().lines === undefined || SubtitleAppearance.defaults().shadow !== undefined) $.evalFile(new File(extensionPath + '/appearance.js'));
         if (typeof SubtitleLayout === 'undefined') $.evalFile(new File(extensionPath + '/layout.js'));
         if (typeof SubtitleIdentity === 'undefined') $.evalFile(new File(extensionPath + '/identity.js'));
         if (typeof createSubtitleBridge === 'undefined') $.evalFile(new File(extensionPath + '/bridge.jsx'));
@@ -425,7 +425,7 @@ var YTSubtitle = (function () {
         } catch (error) { return JSON.stringify({ ok: false, error: String(error.message || error) + ' Updated ' + updated + ' graphics before stopping.' }); }
     }
 
-    return { apiVersion: 5, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
+    return { apiVersion: 7, initialize: initialize, inspect: inspect, createProof: createProof, getContext: getContext, loadTranscript: loadTranscript, beginGeneration: beginGeneration, insertBatch: insertBatch, captureStyle: captureStyle, applyStyle: applyStyle, setParentFromPlayhead: setParentFromPlayhead, syncSelectedToParent: syncSelectedToParent, readPhrase: readPhrase, updatePhrase: updatePhrase,
         requestTranscript: function (context) { return bridge.requestTranscript(context); },
         pollTranscript: function (id) { return bridge.pollTranscript(id); },
         readSession: function (context) { return bridge.readSession(context); },

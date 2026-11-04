@@ -61,13 +61,36 @@ function renderFonts() {
   element('font-status').textContent = query ? matches.length + ' matching font faces. Current selection is retained.' : fontCatalog.length + ' font faces available.';
 }
 
+function validateFields(ids) {
+  let first = null;
+  ids.forEach(id => {
+    const input = element(id), value = String(input.value).trim();
+    const bounds = id === 'characters' ? [1, 200] : id === 'font-size' ? [8, 240] : [0, 100];
+    const color = id.endsWith('-hex');
+    const valid = color ? /^#[0-9a-f]{6}$/i.test(value) : value !== '' && Number.isFinite(Number(value)) && Number(value) >= bounds[0] && Number(value) <= bounds[1] && (id !== 'characters' || Number.isInteger(Number(value)));
+    const name = { characters: 'Phrase length', 'font-size': 'Font size', 'position-x': 'Horizontal position', 'position-y': 'Vertical position', 'text-color-hex': 'Text color', 'highlight-color-hex': 'Highlight color' }[id];
+    const message = color ? name + ': enter a six-digit hex color, such as #ebebeb.' : name + ': enter ' + (id === 'characters' ? 'a whole number' : 'a number') + ' from ' + bounds[0] + ' to ' + bounds[1] + '.';
+    const error = element(id + '-error');
+    if (error.hidden !== valid || error.textContent !== (valid ? '' : message)) {
+      input.setAttribute('aria-invalid', String(!valid));
+      error.textContent = valid ? '' : message;
+      error.hidden = valid;
+    }
+    if (!valid && !first) first = { id, message };
+  });
+  return first;
+}
+
+const styleFields = ['font-size', 'text-color-hex', 'highlight-color-hex', 'position-x', 'position-y'];
 function appearance() {
+  const invalid = validateFields(styleFields);
+  if (invalid) throw new Error(invalid.message);
   return SubtitleAppearance.validate({ font: element('font').value.trim(), size: Number(element('font-size').value), textColor: element('text-color-hex').value.trim(), highlightColor: element('highlight-color-hex').value.trim(), x: Number(element('position-x').value), y: Number(element('position-y').value), mode: element('animation').value, alignment: element('alignment').value, centeredReveal: element('default-layout').checked, lines: Number(element('max-lines').value) });
 }
 
 function host(expression) {
   const root = window.__adobe_cep__.getSystemPath('extension');
-  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==5){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
+  const bootstrap = 'if(typeof YTSubtitle==="undefined"||YTSubtitle.apiVersion!==7){$.evalFile(new File(' + argument(root + '/host.jsx') + '));}YTSubtitle.initialize(' + argument(root) + ');';
   return new Promise((resolve, reject) => window.__adobe_cep__.evalScript(bootstrap + expression, raw => {
     try {
       if (raw === 'EvalScript error.') throw new Error('Subtitle Generator could not connect to Premiere. Close and reopen this panel, then try again.');
@@ -89,13 +112,13 @@ function controls() {
   element('cancel').disabled = !generating;
   element('update-phrase').disabled = busy || !phraseSnapshot;
   ['characters', 'single-word', 'font-search', 'text-color-hex', 'highlight-color-hex'].concat(appearanceIds).forEach(id => { element(id).disabled = busy || !settingsHistory; });
-  element('undo-settings').disabled = busy || !settingsHistory || !settingsHistory.canUndo();
-  element('redo-settings').disabled = busy || !settingsHistory || !settingsHistory.canRedo();
   element('reset-style').disabled = busy || !settingsHistory;
 }
 
 function preview() {
   stopPreview();
+  const invalid = validateFields(['characters']);
+  if (invalid) throw new Error(invalid.message);
   const sample = { segments: [{ words: ['Preview', 'your', 'subtitles.'].map((text, i) => ({ text, start: i * .5, duration: .5 })) }] };
   const source = planTranscript(loaded ? loaded.data : sample, Number(element('characters').value), element('single-word').checked, loaded ? loaded.context.fps : 30);
   const style = appearance();
@@ -243,8 +266,11 @@ element('discard-run').addEventListener('click', () => {
 });
 element('generate').addEventListener('click', async () => {
   if (busy || pendingRun || !loaded) return;
+  let invalid;
   try {
     busy = true; controls();
+    invalid = validateFields(['characters'].concat(styleFields));
+    if (invalid) throw new Error(invalid.message);
     if (loaded.source === 'premiere' && !await sessions.refresh()) throw new Error(transcriptError || 'Could not refresh this timeline transcript.');
     const plan = preview();
     const settings = appearance();
@@ -257,7 +283,15 @@ element('generate').addEventListener('click', async () => {
     element('generation-progress').value = 0;
     await continueGeneration();
   } catch (error) { element('status').textContent = error.message; }
-  finally { busy = false; generating = false; controls(); }
+  finally {
+    busy = false; generating = false; controls();
+    if (invalid) {
+      showTab(invalid.id === 'characters' ? 'generate' : 'style');
+      const input = element(invalid.id), section = input.closest && input.closest('.style-section');
+      if (section) section.open = true;
+      input.focus();
+    }
+  }
 });
 
 async function editSelected(expression, completed) {
@@ -289,7 +323,11 @@ element('update-phrase').addEventListener('click', () => {
 });
 
 function updateAppearance(group) {
-  try { appearance(); if (group === 'default-layout' || group === 'max-lines') preview(); else drawPreview(); recordSettings(group); queueSettingsSave(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
+  try {
+    appearance(); if (group === 'default-layout' || group === 'max-lines') preview(); else drawPreview(); recordSettings(group); queueSettingsSave();
+    const message = 'Appearance updated for newly generated graphics.';
+    if (element('status').textContent !== message) element('status').textContent = message;
+  }
   catch (error) { stopPreview(); element('status').textContent = error.message; }
 }
 ['font-size', 'position-x', 'position-y'].forEach(id => attachSubtitleScrub(element(id), () => updateAppearance(id), finishSettingsEdit));
@@ -323,8 +361,9 @@ tabIds.forEach((id, index) => {
   element('tab-' + id).addEventListener('click', () => showTab(id));
   element('tab-' + id).addEventListener('keydown', event => {
     let next;
-    if (event.key === 'ArrowRight') next = (index + 1) % tabIds.length;
-    else if (event.key === 'ArrowLeft') next = (index + tabIds.length - 1) % tabIds.length;
+    const forward = document.documentElement && document.documentElement.dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
+    if (event.key === forward) next = (index + 1) % tabIds.length;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') next = (index + tabIds.length - 1) % tabIds.length;
     else if (event.key === 'Home') next = 0;
     else if (event.key === 'End') next = tabIds.length - 1;
     else return;
@@ -371,8 +410,6 @@ function restoreSettingsHistory(direction) {
   applySettings(settings); queueSettingsSave(); controls();
   element('status').textContent = direction === 'undo' ? 'Undid panel settings.' : 'Redid panel settings.';
 }
-element('undo-settings').addEventListener('click', () => restoreSettingsHistory('undo'));
-element('redo-settings').addEventListener('click', () => restoreSettingsHistory('redo'));
 document.addEventListener('keydown', event => {
   if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.isComposing) return;
   const key = event.key.toLowerCase();
