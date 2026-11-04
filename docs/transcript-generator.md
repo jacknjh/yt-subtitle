@@ -24,7 +24,7 @@ To fix a phrase, select one generated graphic and choose **Read selected phrase*
 
 ## Verification and remaining work
 
-74 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
+80 automated tests pass, including invalid timing, frame collisions, partial generation, sequence switching, selection isolation, phrase corrections, parent identity/latest-style reads, preview settings, font-name parsing, tabs, hex colors, cold-start initialization and preserving timeline edits. Before the reuse optimization, a real 26.2.2 run generated all 1,205 word graphics in a duplicate sequence. Every clip's text and start/end boundaries were compared with the plan (within one microsecond), and all passed. The original sequence's formerly empty top track remained empty. A separate project copy was saved successfully as `test - animated subtitles.prproj`.
 
 Live style capture/application and phrase updates succeeded. The reloaded panel's Read selected phrase button populated `Hello, guys.` and enabled phrase editing. Final video frame exports showed `Hello,` followed by `Hello, guys.` in the lower part of the frame with the newest word highlighted. Existing source captions and the earlier native test title remain visible separately.
 
@@ -65,6 +65,7 @@ The canvas preview uses the same planned word intervals and settings, but browse
 | Read selected phrase | Load the full phrase associated with one selected generated graphic. |
 | Update phrase text | Rewrite its word-prefix graphics using the corrected phrase, retaining current clip boundaries. |
 | Search fonts / Font face | Filter local font faces and choose one from a native dropdown. Searching retains the current choice until another face is selected. |
+| Font size / Horizontal / Vertical | Drag left or right to adjust, hold Shift for fine control, or click to type. Enter finishes typing; Escape cancels a drag. |
 | Color swatch / hex field | Open a native picker from the swatch, or enter #RRGGBB directly. Labels and surrounding space do not open the picker. |
 | Help tab | Read the in-panel usage guide. |
 
@@ -97,3 +98,11 @@ After the user restarted Premiere, the installed External reader heartbeat and c
 Generation no longer clones the sequence. Native state and the panel keep the completed word count on safe pauses, including partial batches interrupted by a sequence switch. Resume does not re-export the transcript or regroup words midway through a run. Before further insertion, the dedicated track is checked against recorded clip identities and boundaries. Changes to that track pause the run; unknown write failures invalidate continuation instead of guessing whether a partial graphic exists.
 
 A live isolated 29.97 fps check generated one word directly in the test sequence, switched to the user’s timeline, confirmed a pause at one completed word, returned and resumed to three words. Text and all boundaries matched readback (0–0.5005, 0.5005–1.001, 1.001–1.5015 seconds). Generation created no duplicate sequence. The temporary test sequence was deleted and the user’s original active timeline restored. The full ten-minute transcript was not regenerated.
+
+## Compact layout and numeric scrubbing, November 4
+
+Generate now has compact transcript and grouping sections without repeated instructions. The timeline name is limited to two displayed lines, with the complete name in its tooltip; word and phrase totals have their own short summary. Manual JSON and first-phrase details remain collapsed. Section rules separate Style’s Typography, Colors, Position and Animation controls, plus related Edit and Help controls.
+
+In the actual CEP renderer at 720 pixels high, Generate content height changed from 586.7 to 381.8 pixels at width 280, from 494.6 to 322.4 at width 420, and from 406.2 to 303.5 at width 800. All four tabs had no horizontal overflow at these widths, and the footer stayed inside the viewport.
+
+Live mouse/keyboard checks verified font size 85 to 95 by dragging, Escape restoring 85, direct typing of 92 and Enter ending editing, horizontal position 15 to 25, and Shift-drag vertical position 80 to 80.5. Original settings were restored afterward. Pointer capture keeps drags active outside the field; cancellation or window focus loss restores the original value. Tests cover bounds, cancellation, edit mode, disabled fields and the shared preview handler. No timeline graphics were generated or modified for this UI change.

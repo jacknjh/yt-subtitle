@@ -8,11 +8,11 @@ const SubtitleAppearance = require('../prototype/cep/appearance');
 function panel(respond) {
   const elements = {};
   const initial = { characters: '24', font: 'Heebo-SemiBold', 'font-size': '85', 'text-color': '#ebebeb', 'highlight-color': '#fffe00', 'text-color-hex': '#ebebeb', 'highlight-color-hex': '#fffe00', 'position-x': '15', 'position-y': '80', animation: 'reveal-highlight' };
-  const document = { createElement() { return {}; }, getElementById(id) {
-    return elements[id] ||= { value: initial[id] || '', checked: false, textContent: '', disabled: false, events: {}, setAttribute(key, value) { this[key] = value; }, focus() { this.focused = true; }, appendChild() {}, addEventListener(event, callback) { this.events[event] = callback; } };
+  const document = { addEventListener() {}, createElement() { return {}; }, getElementById(id) {
+    return elements[id] ||= { ownerDocument: document, value: initial[id] || '', checked: false, textContent: '', disabled: false, events: {}, setAttribute(key, value) { this[key] = value; }, focus() { this.focused = true; }, appendChild() {}, addEventListener(event, callback) { this.events[event] = callback; } };
   } };
   const calls = [];
-  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, createTranscriptSessions: require('../prototype/cep/sessions'), setTimeout, clearTimeout, window: {
+  const context = vm.createContext({ document, planTranscript, SubtitleAppearance, attachSubtitleScrub: require('../prototype/cep/scrub'), createTranscriptSessions: require('../prototype/cep/sessions'), setTimeout, clearTimeout, window: {
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     SubtitleFonts: [{ postscript: 'Example-Bold', label: 'Example Bold', family: 'Example', style: 'Bold' }],
     proofConfig: { templatePath: 'template.mogrt' },
@@ -131,6 +131,21 @@ test('invalid appearance pauses the preview so it can restart after correction',
   p.elements['font-size'].value = '85'; p.elements['font-size'].events.input();
   p.elements['preview-play'].events.click();
   assert.equal(p.elements['preview-play'].textContent, 'Pause preview');
+});
+
+test('dragging an appearance value uses the existing preview and settings handler', () => {
+  const p = panel(() => ({ ok: true }));
+  const field = p.elements['font-size'];
+  field.min = '8'; field.max = '240';
+  field.setPointerCapture = () => {}; field.releasePointerCapture = () => {};
+  field.ownerDocument.body = { classList: { add() {}, remove() {} } };
+  const event = x => ({ clientX: x, pointerId: 1, button: 0, preventDefault() {} });
+  field.events.pointerdown(event(100));
+  field.events.pointermove(event(120));
+  field.events.pointerup(event(120));
+  assert.equal(Number(field.value), 90);
+  assert.match(p.elements.status.textContent, /Appearance updated/);
+  for (const id of ['position-x', 'position-y']) assert.equal(typeof p.elements[id].events.pointerdown, 'function');
 });
 
 test('tabs preserve settings and support arrow-key navigation while pausing hidden previews', () => {

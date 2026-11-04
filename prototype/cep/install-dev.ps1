@@ -23,7 +23,7 @@ if (-not (Test-Path -LiteralPath $statePath)) {
         ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding utf8
 }
 
-foreach ($file in @('index.html', 'main.js', 'planner.js', 'appearance.js', 'sessions.js', 'font-data.js', 'host.jsx', 'bridge.jsx', '.debug')) {
+foreach ($file in @('index.html', 'main.js', 'planner.js', 'appearance.js', 'scrub.js', 'sessions.js', 'font-data.js', 'host.jsx', 'bridge.jsx', '.debug')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $installPath $file) -Force
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../identity.js') -Destination (Join-Path $installPath 'identity.js') -Force

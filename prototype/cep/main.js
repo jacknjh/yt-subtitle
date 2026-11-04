@@ -88,7 +88,7 @@ function preview() {
   stopPreview();
   const sample = { segments: [{ words: ['Preview', 'your', 'subtitles.'].map((text, i) => ({ text, start: i * .5, duration: .5 })) }] };
   const plan = planTranscript(loaded ? loaded.data : sample, Number(element('characters').value), element('single-word').checked, loaded ? loaded.context.fps : 30);
-  if (loaded) element('summary').textContent = loaded.context.sequenceName + ': ' + plan.wordCount + ' words, ' + plan.phrases.length + ' phrases.';
+  if (loaded) element('summary').textContent = plan.wordCount + ' words · ' + plan.phrases.length + ' phrases';
   element('preview').textContent = plan.phrases.slice(0, 5).join('\n');
   renderedPlan = plan;
   const select = element('preview-phrase');
@@ -265,6 +265,7 @@ function updateAppearance() {
   try { appearance(); drawPreview(); queueSettingsSave(); element('status').textContent = 'Appearance updated for newly generated graphics.'; }
   catch (error) { stopPreview(); element('status').textContent = error.message; }
 }
+['font-size', 'position-x', 'position-y'].forEach(id => attachSubtitleScrub(element(id), updateAppearance));
 appearanceIds.filter(id => id !== 'text-color' && id !== 'highlight-color').forEach(id => {
   element(id).addEventListener('input', updateAppearance);
   element(id).addEventListener('change', updateAppearance);
@@ -332,6 +333,7 @@ const sessions = createTranscriptSessions({
     loaded = null; transcriptFresh = false; parentReady = false; phraseSnapshot = null;
     element('parent-status').textContent = 'Set a parent in this timeline to sync its graphics.';
     element('sequence-label').textContent = context ? 'Timeline: ' + context.sequenceName : 'Open a project and timeline in Premiere.';
+    element('sequence-label').title = context ? context.sequenceName : '';
     element('summary').textContent = context ? 'Reading this timeline’s transcript…' : 'No active timeline.';
     element('transcript-source').textContent = ''; controls();
   },
